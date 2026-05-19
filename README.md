@@ -4,6 +4,11 @@
 
 本项目实现 `D:\py\agent.md` 中描述的诊断工作流：主 Agent 负责任务协调，依次调度任务规划、错误分析、慢 SQL 分析和根因分析，最终返回包含证据与修复步骤的结构化报告。
 
+系统支持两种触发方式：
+
+- 手动诊断：用户提交故障描述后立即执行完整诊断。
+- 告警驱动诊断：Prometheus、ELK、XXL-Job 或其他告警系统推送事件后，系统自动创建诊断任务并在后台运行 Agent 工作流。
+
 ## 环境要求
 
 - Python 3.10+
@@ -47,6 +52,7 @@ DATA_SOURCE_MODE=sample
 
 - `GET /health`
 - `POST /api/v1/diagnoses`
+- `POST /api/v1/alerts`
 - `GET /api/v1/diagnoses/{diagnosis_id}`
 - `POST /api/v1/diagnoses/{diagnosis_id}/input`
 - `GET /api/v1/reports/{diagnosis_id}`
@@ -72,6 +78,41 @@ uvicorn app.main:app --reload --port 8000
 curl -X POST http://127.0.0.1:8000/api/v1/diagnoses ^
   -H "Content-Type: application/json" ^
   -d "{\"fault_description\":\"登录接口响应超时，用户反馈下单前认证失败\"}"
+```
+
+## 告警驱动诊断
+
+`POST /api/v1/alerts` 用于接收外部告警事件。接口会把告警内容转换为诊断上下文，创建诊断记录，然后返回 `202 Accepted`。后续的任务规划、数据采集、错误分析、慢 SQL 分析和根因分析会在后台继续执行。
+
+请求示例：
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/alerts ^
+  -H "Content-Type: application/json" ^
+  -d "{\"source\":\"prometheus\",\"title\":\"login api p95 latency high\",\"severity\":\"critical\",\"description\":\"登录接口 P95 延迟超过阈值\",\"labels\":{\"service\":\"gateway-api\"}}"
+```
+
+主要字段：
+
+- `source`：告警来源，例如 `prometheus`、`elk`、`xxl-job`。
+- `title`：告警标题。
+- `severity`：告警级别，支持 `critical`、`high`、`medium`、`low`、`info`。
+- `service_hint`：可选，明确指定受影响服务。
+- `description`：可选，告警描述。
+- `triggered_at`：可选，告警触发时间。
+- `labels` / `annotations` / `metadata`：可选，保存告警系统传入的上下文。
+
+如果没有传入 `service_hint`，系统会尝试从 `labels.service`、`labels.service_name`、`labels.app`、`labels.application` 或 `labels.job` 中推断服务名。
+
+返回结果中会包含 `diagnosis_id`，并记录：
+
+- `trigger_source: "alert"`
+- `trigger_context`：原始告警 payload
+
+查询诊断进度：
+
+```bash
+curl http://127.0.0.1:8000/api/v1/diagnoses/{diagnosis_id}
 ```
 
 获取报告：
@@ -104,6 +145,7 @@ curl -X POST http://127.0.0.1:8000/api/v1/diagnoses/{diagnosis_id}/input ^
 
 一次成功诊断会包含：
 
+- trigger source and context
 - task plan
 - collected data
 - error analysis timeline
