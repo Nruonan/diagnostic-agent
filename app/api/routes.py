@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 
 from app.config import Settings
 from app.reports import ReportGenerator
+from app.schemas.alerts import AlertEventCreate
 from app.schemas.diagnosis import DiagnosisCreate, DiagnosisResponse, DiagnosisStatus, HumanInputCreate
 from app.schemas.reports import ReportResponse
 from app.workflow import WorkflowEngine
@@ -42,6 +43,25 @@ async def create_diagnosis(
     return DiagnosisResponse(diagnosis=await engine.start(payload))
 
 
+@router.post("/api/v1/alerts", response_model=DiagnosisResponse, status_code=202)
+async def ingest_alert(
+    payload: AlertEventCreate,
+    background_tasks: BackgroundTasks,
+    engine: WorkflowEngine = Depends(get_engine),
+    settings: Settings = Depends(get_settings_from_app),
+) -> DiagnosisResponse:
+    if not settings.dashscope_configured():
+        raise HTTPException(status_code=503, detail="DASHSCOPE_API_KEY is not configured")
+    request = payload.to_diagnosis_create()
+    state = await engine.create(
+        request,
+        trigger_source="alert",
+        trigger_context=payload.model_dump(mode="json"),
+    )
+    background_tasks.add_task(engine.run, state.diagnosis_id)
+    return DiagnosisResponse(diagnosis=state)
+
+
 @router.get("/api/v1/diagnoses/{diagnosis_id}", response_model=DiagnosisResponse)
 async def get_diagnosis(diagnosis_id: str, engine: WorkflowEngine = Depends(get_engine)) -> DiagnosisResponse:
     return DiagnosisResponse(diagnosis=await engine.get(diagnosis_id))
@@ -77,4 +97,3 @@ async def get_report_markdown(
     if state.status not in {DiagnosisStatus.COMPLETED, DiagnosisStatus.NEED_USER_INPUT, DiagnosisStatus.FAILED}:
         raise HTTPException(status_code=409, detail=f"diagnosis status is {state.status.value}")
     return generator.to_markdown(state)
-

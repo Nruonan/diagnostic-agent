@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any
 from uuid import uuid4
 
 from app.agents import MainAgent
@@ -22,14 +23,34 @@ class WorkflowEngine:
         self.store = store
         self.low_confidence_threshold = low_confidence_threshold
 
-    async def start(self, request: DiagnosisCreate) -> DiagnosisState:
+    async def start(
+        self,
+        request: DiagnosisCreate,
+        trigger_source: str = "manual",
+        trigger_context: dict[str, Any] | None = None,
+    ) -> DiagnosisState:
+        state = await self.create(request, trigger_source, trigger_context)
+        return await self._run(state)
+
+    async def create(
+        self,
+        request: DiagnosisCreate,
+        trigger_source: str = "manual",
+        trigger_context: dict[str, Any] | None = None,
+    ) -> DiagnosisState:
         state = DiagnosisState(
             diagnosis_id=str(uuid4()),
             status=DiagnosisStatus.CREATED,
             fault_description=request.fault_description,
             service_hint=request.service_hint,
+            trigger_source=trigger_source,
+            trigger_context=trigger_context,
         )
         await self.store.save(state)
+        return state
+
+    async def run(self, diagnosis_id: str) -> DiagnosisState:
+        state = await self.store.get(diagnosis_id)
         return await self._run(state)
 
     async def add_human_input(self, diagnosis_id: str, content: str) -> DiagnosisState:
@@ -90,4 +111,3 @@ class WorkflowEngine:
         state.updated_at = utc_now().isoformat()
         await self.store.save(state)
         return state
-

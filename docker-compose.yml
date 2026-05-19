@@ -1,0 +1,31 @@
+services:
+  diagnostic-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATA_SOURCE_MODE: http
+      ELK_API_URL: http://datasource-mock:9000/elk
+      XXL_JOB_API_URL: http://datasource-mock:9000/xxl-job
+      SLOW_QUERY_API_URL: http://datasource-mock:9000/slow-query
+      TRACE_API_URL: http://datasource-mock:9000/trace
+      GIT_CODE_API_URL: http://datasource-mock:9000/git-code
+      RUNTIME_DIR: /app/.runtime
+    ports:
+      - "8010:8000"
+    depends_on:
+      - datasource-mock
+    volumes:
+      - diagnostic_runtime:/app/.runtime
+
+  datasource-mock:
+    build:
+      context: .
+      dockerfile: docker/datasource-mock/Dockerfile
+    ports:
+      - "9000:9000"
+
+volumes:
+  diagnostic_runtime:

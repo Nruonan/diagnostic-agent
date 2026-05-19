@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field
+from typing import Any
+
+from pydantic import BaseModel, Field, field_validator
 
 
 class TaskItem(BaseModel):
@@ -23,6 +25,16 @@ class ErrorItem(BaseModel):
     message: str
     trace_id: str | None = None
     evidence: list[str] = Field(default_factory=list)
+
+    @field_validator("evidence", mode="before")
+    @classmethod
+    def normalize_evidence(cls, value: Any) -> Any:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            normalized = value.strip()
+            return [normalized] if normalized else []
+        return value
 
 
 class ErrorAnalysisOutput(BaseModel):
@@ -55,4 +67,3 @@ class RootCauseOutput(BaseModel):
     fix_steps: list[str]
     mermaid: str
     missing_information: list[str] = Field(default_factory=list)
-

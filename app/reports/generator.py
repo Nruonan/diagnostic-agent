@@ -9,7 +9,8 @@ class ReportGenerator:
             return (
                 f"# Diagnosis Report\n\n"
                 f"- Diagnosis ID: `{state.diagnosis_id}`\n"
-                f"- Status: `{state.status.value}`\n\n"
+                f"- Status: `{state.status.value}`\n"
+                f"- Trigger: `{state.trigger_source}`\n\n"
                 f"## Errors\n\n{error_text}\n"
             )
 
@@ -28,6 +29,7 @@ class ReportGenerator:
             f"# Diagnosis Report\n\n"
             f"- Diagnosis ID: `{state.diagnosis_id}`\n"
             f"- Status: `{state.status.value}`\n"
+            f"- Trigger: `{state.trigger_source}`\n"
             f"- Fault: {state.fault_description}\n"
             f"- Confidence: `{root.confidence:.2f}`\n\n"
             f"## Root Cause\n\n{root.root_cause}\n\n"
@@ -37,4 +39,3 @@ class ReportGenerator:
             f"## Data Source Issues\n\n{source_errors}\n\n"
             f"## Mermaid\n\n```mermaid\n{root.mermaid}\n```\n"
         )
-

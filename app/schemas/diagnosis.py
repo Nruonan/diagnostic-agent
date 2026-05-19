@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -29,6 +30,8 @@ class DiagnosisState(BaseModel):
     status: DiagnosisStatus
     fault_description: str
     service_hint: str | None = None
+    trigger_source: str = "manual"
+    trigger_context: dict[str, Any] | None = None
     created_at: str = Field(default_factory=lambda: utc_now().isoformat())
     updated_at: str = Field(default_factory=lambda: utc_now().isoformat())
     human_inputs: list[str] = Field(default_factory=list)
@@ -43,4 +46,3 @@ class DiagnosisState(BaseModel):
 
 class DiagnosisResponse(BaseModel):
     diagnosis: DiagnosisState
-
