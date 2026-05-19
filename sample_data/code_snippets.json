@@ -1,0 +1,21 @@
+[
+  {
+    "repository": "user-service",
+    "file_path": "src/main/java/com/example/user/UserProfileRepository.java",
+    "service": "user-service",
+    "start_line": 41,
+    "end_line": 58,
+    "language": "java",
+    "content": "public UserProfile findLatestByMobile(String mobile) {\\n    return jdbcTemplate.queryForObject(\\n        \"SELECT * FROM user_profile WHERE mobile = ? AND deleted = 0 ORDER BY updated_at DESC\",\\n        mapper,\\n        mobile\\n    );\\n}"
+  },
+  {
+    "repository": "user-service",
+    "file_path": "db/migrations/V20260518__user_profile_indexes.sql",
+    "service": "user-service",
+    "start_line": 1,
+    "end_line": 6,
+    "language": "sql",
+    "content": "CREATE INDEX idx_user_profile_user_id ON user_profile(user_id);\\nCREATE INDEX idx_user_profile_updated_at ON user_profile(updated_at);"
+  }
+]
+

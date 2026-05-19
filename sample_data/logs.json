@@ -1,0 +1,29 @@
+[
+  {
+    "timestamp": "2026-05-19T09:59:58+08:00",
+    "service": "gateway-api",
+    "level": "ERROR",
+    "message": "POST /login timed out after 3000ms while waiting for user-service",
+    "trace_id": "trace-login-001",
+    "error_type": "Timeout",
+    "stack_trace": "TimeoutError: upstream user-service exceeded deadline"
+  },
+  {
+    "timestamp": "2026-05-19T10:00:01+08:00",
+    "service": "user-service",
+    "level": "ERROR",
+    "message": "Authentication query exceeded service deadline",
+    "trace_id": "trace-login-001",
+    "error_type": "DatabaseTimeout",
+    "stack_trace": "DatabaseTimeout: SELECT user profile by mobile"
+  },
+  {
+    "timestamp": "2026-05-19T10:00:04+08:00",
+    "service": "order-service",
+    "level": "WARN",
+    "message": "Checkout pre-auth failed because login token was not issued",
+    "trace_id": "trace-login-001",
+    "error_type": "AuthDependencyFailure"
+  }
+]
+

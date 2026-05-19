@@ -1,0 +1,23 @@
+[
+  {
+    "timestamp": "2026-05-19T09:59:59+08:00",
+    "service": "user-service",
+    "database": "user_db",
+    "query": "SELECT * FROM user_profile WHERE mobile = ? AND deleted = 0 ORDER BY updated_at DESC",
+    "exec_time_ms": 5240,
+    "rows_examined": 1284300,
+    "lock_time_ms": 16,
+    "trace_id": "trace-login-001"
+  },
+  {
+    "timestamp": "2026-05-19T10:00:03+08:00",
+    "service": "user-service",
+    "database": "user_db",
+    "query": "SELECT role_id FROM user_role WHERE user_id = ?",
+    "exec_time_ms": 180,
+    "rows_examined": 24,
+    "lock_time_ms": 2,
+    "trace_id": "trace-login-001"
+  }
+]
+

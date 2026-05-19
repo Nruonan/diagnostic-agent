@@ -1,0 +1,19 @@
+[
+  {
+    "timestamp": "2026-05-19T09:58:30+08:00",
+    "job_name": "sync_user_profile_cache",
+    "status": "FAILED",
+    "duration_ms": 62000,
+    "message": "Cache warmup failed after database read timeout",
+    "trace_id": "trace-job-778"
+  },
+  {
+    "timestamp": "2026-05-19T10:00:10+08:00",
+    "job_name": "sync_user_profile_cache",
+    "status": "RETRYING",
+    "duration_ms": 30000,
+    "message": "Retry scheduled, user profile cache remains stale",
+    "trace_id": "trace-job-779"
+  }
+]
+

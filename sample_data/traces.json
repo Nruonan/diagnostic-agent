@@ -1,0 +1,33 @@
+[
+  {
+    "trace_id": "trace-login-001",
+    "span_id": "span-1",
+    "parent_span_id": null,
+    "service": "gateway-api",
+    "operation": "POST /login",
+    "start_time": "2026-05-19T09:59:57+08:00",
+    "duration_ms": 3020,
+    "status": "ERROR"
+  },
+  {
+    "trace_id": "trace-login-001",
+    "span_id": "span-2",
+    "parent_span_id": "span-1",
+    "service": "user-service",
+    "operation": "AuthenticateUser",
+    "start_time": "2026-05-19T09:59:57+08:00",
+    "duration_ms": 2890,
+    "status": "ERROR"
+  },
+  {
+    "trace_id": "trace-login-001",
+    "span_id": "span-3",
+    "parent_span_id": "span-2",
+    "service": "user-service",
+    "operation": "QueryUserProfile",
+    "start_time": "2026-05-19T09:59:58+08:00",
+    "duration_ms": 5240,
+    "status": "ERROR"
+  }
+]
+
