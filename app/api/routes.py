@@ -3,6 +3,7 @@ from fastapi.responses import PlainTextResponse
 
 from app.api.deps import get_engine, get_report_generator, get_settings_from_app
 from app.config import Settings
+from app.reports import ReportGenerator
 from app.schemas.alerts import AlertEventCreate
 from app.schemas.diagnosis import DiagnosisCreate, DiagnosisResponse, DiagnosisStatus, HumanInputCreate
 from app.schemas.reports import ReportResponse

@@ -2,7 +2,7 @@
 
 基于 DashScope 的分布式系统故障排查自动化后端。
 
-项目实现 `D:\py\agent.md` 中描述的诊断工作流：主 Agent 负责任务协调，依次调度任务规划、错误分析、慢 SQL 分析和根因分析，最终返回包含证据与修复步骤的结构化报告。
+项目中描述的诊断工作流：主 Agent 负责任务协调，依次调度任务规划、错误分析、慢 SQL 分析和根因分析，最终返回包含证据与修复步骤的结构化报告。
 
 系统支持三种触发方式：
 
@@ -254,19 +254,3 @@ curl -X POST http://127.0.0.1:8000/api/v1/diagnoses/{diagnosis_id}/input ^
   "detail": "DASHSCOPE_API_KEY is not configured"
 }
 ```
-
-## 回滚
-
-本项目独立位于 `D:\py\ai-diagnostic-agent`。如需回滚本次 webhook 和 compose 集成，恢复以下路径即可：
-
-- `app/api/deps.py`
-- `app/api/routes.py`
-- `app/config.py`
-- `app/main.py`
-- `app/webhooks/`
-- `docker-compose.yml`
-- `docker/alertmanager/`
-- `docker/elastalert/`
-- `docker/prometheus/`
-- `docker/xxl-job/`
-- `README.md`

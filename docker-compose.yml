@@ -26,8 +26,20 @@ services:
     build:
       context: .
       dockerfile: docker/datasource-mock/Dockerfile
+    environment:
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      XXL_JOB_MYSQL_HOST: xxl-job-mysql
+      XXL_JOB_MYSQL_PORT: 3306
+      XXL_JOB_MYSQL_DATABASE: xxl_job
+      XXL_JOB_MYSQL_USER: xxl_job
+      XXL_JOB_MYSQL_PASSWORD: ${XXL_JOB_DB_PASSWORD:-xxl_job}
     ports:
       - "9000:9000"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      xxl-job-mysql:
+        condition: service_healthy
 
   prometheus:
     image: prom/prometheus:v2.55.1
@@ -155,7 +167,7 @@ services:
       xpack.security.enabled: "false"
       ES_JAVA_OPTS: -Xms512m -Xmx512m
     ports:
-      - "9200:9200"
+      - "9202:9200"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9200/_cluster/health >/dev/null || exit 1"]
       interval: 15s
@@ -165,7 +177,7 @@ services:
       - elasticsearch_data:/usr/share/elasticsearch/data
 
   elastalert:
-    image: jertel/elastalert2:2.28.0
+    image: ghcr.io/jertel/elastalert2/elastalert2:2.28.0
     volumes:
       - ./docker/elastalert/config.yaml:/opt/elastalert/config.yaml:ro
       - ./docker/elastalert/rules:/opt/elastalert/rules:ro

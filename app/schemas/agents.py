@@ -1,15 +1,43 @@
+import json
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
 
+def normalize_string_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [text for item in value if (text := stringify_list_item(item))]
+    text = stringify_list_item(value)
+    return [text] if text else []
+
+
+def stringify_list_item(value: Any) -> str:
+    if isinstance(value, dict):
+        if "timestamp" in value and "description" in value:
+            return f"{value['timestamp']} - {value['description']}"
+        return json.dumps(value, ensure_ascii=False)
+    return str(value).strip()
+
+
 class TaskItem(BaseModel):
-    id: int
+    id: str
     name: str
     priority: int = Field(ge=1, le=5)
     sources: list[str]
-    dependencies: list[int] = Field(default_factory=list)
+    dependencies: list[str] = Field(default_factory=list)
     reason: str
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def normalize_id(cls, value: Any) -> str:
+        return str(value)
+
+    @field_validator("dependencies", mode="before")
+    @classmethod
+    def normalize_dependencies(cls, value: Any) -> list[str]:
+        return normalize_string_list(value)
 
 
 class PlanningOutput(BaseModel):
@@ -29,12 +57,7 @@ class ErrorItem(BaseModel):
     @field_validator("evidence", mode="before")
     @classmethod
     def normalize_evidence(cls, value: Any) -> Any:
-        if value is None:
-            return []
-        if isinstance(value, str):
-            normalized = value.strip()
-            return [normalized] if normalized else []
-        return value
+        return normalize_string_list(value)
 
 
 class ErrorAnalysisOutput(BaseModel):
@@ -42,6 +65,11 @@ class ErrorAnalysisOutput(BaseModel):
     timeline: list[str]
     suspects: list[str]
     summary: str
+
+    @field_validator("timeline", "suspects", mode="before")
+    @classmethod
+    def normalize_string_fields(cls, value: Any) -> list[str]:
+        return normalize_string_list(value)
 
 
 class SlowQueryFinding(BaseModel):
@@ -53,11 +81,21 @@ class SlowQueryFinding(BaseModel):
     optimizations: list[str]
     trace_id: str | None = None
 
+    @field_validator("issues", "optimizations", mode="before")
+    @classmethod
+    def normalize_string_fields(cls, value: Any) -> list[str]:
+        return normalize_string_list(value)
+
 
 class SlowSqlAnalysisOutput(BaseModel):
     slow_queries: list[SlowQueryFinding]
     optimizations: list[str]
     summary: str
+
+    @field_validator("optimizations", mode="before")
+    @classmethod
+    def normalize_optimizations(cls, value: Any) -> list[str]:
+        return normalize_string_list(value)
 
 
 class RootCauseOutput(BaseModel):
@@ -67,3 +105,8 @@ class RootCauseOutput(BaseModel):
     fix_steps: list[str]
     mermaid: str
     missing_information: list[str] = Field(default_factory=list)
+
+    @field_validator("evidence", "fix_steps", "missing_information", mode="before")
+    @classmethod
+    def normalize_string_fields(cls, value: Any) -> list[str]:
+        return normalize_string_list(value)

@@ -1,5 +1,8 @@
 FROM python:3.11-slim
 
+ENV PIP_DEFAULT_TIMEOUT=180 \
+    PIP_RETRIES=10
+
 WORKDIR /app
 
 COPY docker/datasource-mock/requirements.txt ./requirements.txt

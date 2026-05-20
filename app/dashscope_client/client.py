@@ -52,7 +52,7 @@ class DashScopeClient:
 
         try:
             async with httpx.AsyncClient(timeout=self.settings.dashscope_timeout_seconds) as client:
-                response = await client.post(self.settings.dashscope_base_url, headers=headers, json=payload)
+                response = await client.post(self._completion_url(), headers=headers, json=payload)
         except httpx.TimeoutException as exc:
             raise DashScopeRequestError("DashScope request timed out") from exc
         except httpx.HTTPError as exc:
@@ -89,6 +89,12 @@ class DashScopeClient:
             if joined.strip():
                 return joined
         raise DashScopeResponseError("DashScope response content is empty")
+
+    def _completion_url(self) -> str:
+        base_url = self.settings.dashscope_base_url.rstrip("/")
+        if base_url.endswith("/chat/completions"):
+            return base_url
+        return f"{base_url}/chat/completions"
 
     def _parse_json_content(self, content: str) -> dict[str, Any]:
         normalized = content.strip()
