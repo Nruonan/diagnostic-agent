@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.agents import MainAgent
@@ -40,6 +40,14 @@ def create_app() -> FastAPI:
     app.state.event_bus = event_bus
     app.include_router(router)
     app.include_router(webhook_router)
+
+    @app.get("/ui/", include_in_schema=False)
+    async def ui_index() -> FileResponse:
+        return FileResponse(
+            Path(__file__).parent / "static" / "index.html",
+            headers={"Cache-Control": "no-cache"},
+        )
+
     app.mount("/ui", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="ui")
 
     @app.get("/")
