@@ -73,15 +73,15 @@
               <strong id="statusValue">--</strong>
             </article>
             <article class="metric">
-              <span>置信度</span>
+              <span>规划任务</span>
               <strong id="confidenceValue">--</strong>
             </article>
             <article class="metric">
-              <span>证据</span>
+              <span>错误</span>
               <strong id="evidenceValue">--</strong>
             </article>
             <article class="metric">
-              <span>修复项</span>
+              <span>慢 SQL</span>
               <strong id="fixValue">--</strong>
             </article>
           </div>
@@ -92,6 +92,61 @@
               <span id="activeId">未选择诊断</span>
             </div>
             <p id="rootCause" class="empty">暂无结果</p>
+          </section>
+
+          <section class="panel output">
+            <div class="section-head">
+              <h2>实时进度</h2>
+              <span id="streamStatus">未连接</span>
+            </div>
+            <ol id="eventList" class="event-list"></ol>
+          </section>
+
+          <section class="panel output">
+            <div class="section-head">
+              <h2>任务规划 Agent</h2>
+              <span id="planningMeta">--</span>
+            </div>
+            <div id="planningTasks" class="card-list"></div>
+            <div class="subsection">
+              <h3>关注服务</h3>
+              <div id="focusServices" class="chip-list"></div>
+            </div>
+          </section>
+
+          <section class="panel output two-column">
+            <div>
+              <div class="section-head">
+                <h2>错误分析 Agent</h2>
+              </div>
+              <p id="errorSummary" class="summary-text empty">暂无结果</p>
+              <div id="errorItems" class="card-list compact-list"></div>
+            </div>
+            <div>
+              <div class="section-head">
+                <h2>时间线 / 嫌疑点</h2>
+              </div>
+              <h3>时间线</h3>
+              <ul id="timelineList" class="data-list"></ul>
+              <h3>嫌疑点</h3>
+              <ul id="suspectList" class="data-list"></ul>
+            </div>
+          </section>
+
+          <section class="panel output two-column">
+            <div>
+              <div class="section-head">
+                <h2>慢 SQL Agent</h2>
+              </div>
+              <p id="slowSummary" class="summary-text empty">暂无结果</p>
+              <div id="slowQueryItems" class="card-list compact-list"></div>
+            </div>
+            <div>
+              <div class="section-head">
+                <h2>SQL 优化建议</h2>
+              </div>
+              <ul id="sqlOptimizationList" class="data-list"></ul>
+            </div>
           </section>
 
           <section class="panel output two-column">
@@ -126,7 +181,14 @@
 
           <section class="panel output">
             <div class="section-head">
-              <h2>报告</h2>
+              <h2>采集数据明细</h2>
+            </div>
+            <div id="collectedDetails" class="card-list"></div>
+          </section>
+
+          <section class="panel output">
+            <div class="section-head">
+              <h2>原始诊断 JSON / Markdown 报告</h2>
             </div>
             <pre id="reportBox">暂无报告</pre>
           </section>

@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from app.agents import MainAgent
 from app.datasources import DataSource
+from app.events import WorkflowEventBus
 from app.llm import LLMConfigurationError, LLMRequestError, LLMResponseError
 from app.schemas.common import RuntimeErrorInfo, utc_now
 from app.schemas.diagnosis import DiagnosisCreate, DiagnosisState, DiagnosisStatus
@@ -16,11 +17,13 @@ class WorkflowEngine:
         data_source: DataSource,
         store: DiagnosisStore,
         low_confidence_threshold: float,
+        event_bus: WorkflowEventBus,
     ):
         self.agents = agents
         self.data_source = data_source
         self.store = store
         self.low_confidence_threshold = low_confidence_threshold
+        self.event_bus = event_bus
 
     async def start(
         self,
@@ -46,6 +49,14 @@ class WorkflowEngine:
             trigger_context=trigger_context,
         )
         await self.store.save(state)
+        await self.event_bus.publish(
+            diagnosis_id=state.diagnosis_id,
+            event="diagnosis_created",
+            stage="workflow",
+            status=state.status.value,
+            message="诊断任务已创建",
+            payload={"trigger_source": trigger_source},
+        )
         return state
 
     async def run(self, diagnosis_id: str) -> DiagnosisState:
@@ -66,12 +77,20 @@ class WorkflowEngine:
         state.status = DiagnosisStatus.RUNNING
         state.updated_at = utc_now().isoformat()
         await self.store.save(state)
+        await self.event_bus.publish(
+            diagnosis_id=state.diagnosis_id,
+            event="diagnosis_started",
+            stage="workflow",
+            status=state.status.value,
+            message="诊断工作流开始执行",
+        )
 
         try:
             state = await self.agents.run(
                 state=state,
                 data_source=self.data_source,
                 low_confidence_threshold=self.low_confidence_threshold,
+                event_bus=self.event_bus,
             )
         except (LLMConfigurationError, LLMRequestError, LLMResponseError) as exc:
             state.status = DiagnosisStatus.FAILED
@@ -84,4 +103,12 @@ class WorkflowEngine:
 
         state.updated_at = utc_now().isoformat()
         await self.store.save(state)
+        await self.event_bus.publish(
+            diagnosis_id=state.diagnosis_id,
+            event="diagnosis_finished",
+            stage="workflow",
+            status=state.status.value,
+            message=f"诊断工作流结束，状态：{state.status.value}",
+            payload={"errors": [error.model_dump(mode="json") for error in state.errors]},
+        )
         return state

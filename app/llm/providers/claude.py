@@ -8,6 +8,7 @@ from app.config import Settings
 from app.llm.base import ModelT
 from app.llm.errors import LLMConfigurationError, LLMRequestError, LLMResponseError
 from app.llm.json_utils import parse_json_content
+from app.llm.metrics import set_current_llm_usage
 
 
 class ClaudeProvider:
@@ -49,7 +50,9 @@ class ClaudeProvider:
         if response.status_code >= 400:
             raise LLMRequestError(f"Claude returned HTTP {response.status_code}: {response.text[:500]}")
 
-        content = self._extract_content(response.json())
+        response_data = response.json()
+        self._record_usage(response_data)
+        content = self._extract_content(response_data)
         data = parse_json_content(content, "Claude")
         try:
             return response_model.model_validate(data)
@@ -77,3 +80,18 @@ class ClaudeProvider:
         if joined.strip():
             return joined
         raise LLMResponseError("Claude response content is empty")
+
+    def _record_usage(self, response_data: dict[str, Any]) -> None:
+        usage = response_data.get("usage")
+        if not isinstance(usage, dict):
+            return
+        set_current_llm_usage(
+            input_tokens=self._int_or_none(usage.get("input_tokens")),
+            output_tokens=self._int_or_none(usage.get("output_tokens")),
+        )
+
+    def _int_or_none(self, value: Any) -> int | None:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None

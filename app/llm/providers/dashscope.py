@@ -8,6 +8,7 @@ from app.config import Settings
 from app.llm.base import ModelT
 from app.llm.errors import LLMConfigurationError, LLMRequestError, LLMResponseError
 from app.llm.json_utils import openai_compatible_content, parse_json_content
+from app.llm.metrics import set_current_llm_usage
 
 
 class DashScopeProvider:
@@ -50,7 +51,9 @@ class DashScopeProvider:
         if response.status_code >= 400:
             raise LLMRequestError(f"DashScope returned HTTP {response.status_code}: {response.text[:500]}")
 
-        content = openai_compatible_content(response.json(), "DashScope")
+        response_data = response.json()
+        _record_usage(response_data)
+        content = openai_compatible_content(response_data, "DashScope")
         data = parse_json_content(content, "DashScope")
         try:
             return response_model.model_validate(data)
@@ -64,3 +67,20 @@ class DashScopeProvider:
         if base_url.endswith("/chat/completions"):
             return base_url
         return f"{base_url}/chat/completions"
+
+
+def _record_usage(response_data: dict[str, Any]) -> None:
+    usage = response_data.get("usage")
+    if not isinstance(usage, dict):
+        return
+    set_current_llm_usage(
+        input_tokens=_int_or_none(usage.get("prompt_tokens")),
+        output_tokens=_int_or_none(usage.get("completion_tokens")),
+    )
+
+
+def _int_or_none(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None

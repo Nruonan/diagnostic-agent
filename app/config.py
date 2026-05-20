@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     claude_api_version: str = Field(default="2023-06-01", alias="CLAUDE_API_VERSION")
     claude_timeout_seconds: float = Field(default=60.0, gt=0, alias="CLAUDE_TIMEOUT_SECONDS")
     claude_max_tokens: int = Field(default=4096, gt=0, alias="CLAUDE_MAX_TOKENS")
+    llm_retry_attempts: int = Field(default=2, ge=0, le=5, alias="LLM_RETRY_ATTEMPTS")
+    llm_retry_backoff_seconds: float = Field(default=0.5, ge=0.0, alias="LLM_RETRY_BACKOFF_SECONDS")
+    llm_fallback_providers: str = Field(default="", alias="LLM_FALLBACK_PROVIDERS")
 
     data_source_mode: Literal["sample", "http"] = Field(default="sample", alias="DATA_SOURCE_MODE")
     elk_api_url: str = Field(default="", alias="ELK_API_URL")
@@ -66,6 +69,41 @@ class Settings(BaseSettings):
         return bool(self.claude_api_key.strip())
 
     def llm_configured(self) -> bool:
+        return self.provider_configured(self.llm_provider)
+
+    def any_llm_configured(self) -> bool:
+        return any(self.provider_configured(provider) for provider in self.ordered_llm_providers())
+
+    def provider_configured(self, provider: str) -> bool:
+        if provider == "dashscope":
+            return self.dashscope_configured()
+        if provider == "openai":
+            return self.openai_configured()
+        if provider == "claude":
+            return self.claude_configured()
+        return False
+
+    def ordered_llm_providers(self) -> list[str]:
+        providers = [self.llm_provider, *self.fallback_provider_names()]
+        if not self.llm_fallback_providers.strip():
+            providers.extend(["dashscope", "openai", "claude"])
+        ordered: list[str] = []
+        for provider in providers:
+            if provider in {"dashscope", "openai", "claude"} and provider not in ordered:
+                ordered.append(provider)
+        return ordered
+
+    def fallback_provider_names(self) -> list[str]:
+        return [
+            provider.strip()
+            for provider in self.llm_fallback_providers.split(",")
+            if provider.strip() in {"dashscope", "openai", "claude"}
+        ]
+
+    def configured_provider_names(self) -> list[str]:
+        return [provider for provider in self.ordered_llm_providers() if self.provider_configured(provider)]
+
+    def primary_llm_configured(self) -> bool:
         if self.llm_provider == "dashscope":
             return self.dashscope_configured()
         if self.llm_provider == "openai":
@@ -75,6 +113,8 @@ class Settings(BaseSettings):
         return False
 
     def llm_missing_configuration_message(self) -> str:
+        if not self.any_llm_configured():
+            return "No LLM provider API key is configured"
         if self.llm_provider == "dashscope":
             return "DASHSCOPE_API_KEY is not configured"
         if self.llm_provider == "openai":

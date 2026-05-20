@@ -60,7 +60,7 @@ def truncate(value: str, limit: int) -> str:
 
 
 def ensure_llm_configured(settings: Settings) -> None:
-    if not settings.llm_configured():
+    if not settings.any_llm_configured():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=settings.llm_missing_configuration_message(),
