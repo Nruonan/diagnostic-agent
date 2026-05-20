@@ -3,6 +3,7 @@ import re
 from base64 import b64decode
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 import pymysql
@@ -253,6 +254,8 @@ async def _search_github_code(fault_description: str, service_hint: str | None) 
     async with httpx.AsyncClient(timeout=15.0, headers=headers) as client:
         for repository in repositories:
             search_items = await _github_search_repository(client, repository, terms)
+            if not search_items:
+                search_items = await _github_tree_candidates(client, repository, terms, service_hint)
             for item in search_items:
                 path = str(item.get("path") or "")
                 repo_name = _github_item_repository(item) or repository
@@ -289,15 +292,14 @@ async def _github_search_repository(
 
 
 async def _github_file_content(client: httpx.AsyncClient, repository: str, path: str) -> str | None:
-    params = {"ref": GITHUB_REF} if GITHUB_REF else None
-    try:
-        response = await client.get(f"{GITHUB_API_URL}/repos/{repository}/contents/{path}", params=params)
-        response.raise_for_status()
-        payload = response.json()
-    except (httpx.HTTPError, ValueError):
+    encoded_path = quote(path, safe="/")
+    payload = await _github_content_payload(client, repository, encoded_path, GITHUB_REF)
+    if payload is None and GITHUB_REF:
+        payload = await _github_content_payload(client, repository, encoded_path, None)
+    if payload is None:
         return None
 
-    if not isinstance(payload, dict) or payload.get("type") != "file":
+    if payload.get("type") != "file":
         return None
     file_size = _int_value(payload.get("size"))
     if file_size and file_size > GITHUB_CODE_MAX_FILE_BYTES:
@@ -308,6 +310,74 @@ async def _github_file_content(client: httpx.AsyncClient, repository: str, path:
         return b64decode(payload["content"]).decode("utf-8", errors="replace")
     except (ValueError, TypeError):
         return None
+
+
+async def _github_content_payload(
+    client: httpx.AsyncClient,
+    repository: str,
+    encoded_path: str,
+    ref: str | None,
+) -> dict[str, Any] | None:
+    params = {"ref": ref} if ref else None
+    try:
+        response = await client.get(f"{GITHUB_API_URL}/repos/{repository}/contents/{encoded_path}", params=params)
+        response.raise_for_status()
+        payload = response.json()
+    except (httpx.HTTPError, ValueError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+async def _github_tree_candidates(
+    client: httpx.AsyncClient,
+    repository: str,
+    terms: list[str],
+    service_hint: str | None,
+) -> list[dict[str, Any]]:
+    tree = await _github_repository_tree(client, repository, GITHUB_REF)
+    if not tree and GITHUB_REF:
+        default_ref = await _github_default_branch(client, repository)
+        tree = await _github_repository_tree(client, repository, default_ref)
+    candidates = [
+        item
+        for item in tree
+        if item.get("type") == "blob" and _is_supported_code_path(str(item.get("path") or ""))
+    ]
+    candidates.sort(key=lambda item: _path_score(str(item.get("path") or ""), terms, service_hint), reverse=True)
+    return [{"path": item.get("path"), "repository": {"full_name": repository}} for item in candidates[:25]]
+
+
+async def _github_repository_tree(
+    client: httpx.AsyncClient,
+    repository: str,
+    ref: str | None,
+) -> list[dict[str, Any]]:
+    if not ref:
+        return []
+    try:
+        response = await client.get(
+            f"{GITHUB_API_URL}/repos/{repository}/git/trees/{quote(ref, safe='')}",
+            params={"recursive": "1"},
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except (httpx.HTTPError, ValueError):
+        return []
+    if payload.get("truncated"):
+        return []
+    tree = payload.get("tree", [])
+    return tree if isinstance(tree, list) else []
+
+
+async def _github_default_branch(client: httpx.AsyncClient, repository: str) -> str | None:
+    try:
+        response = await client.get(f"{GITHUB_API_URL}/repos/{repository}")
+        response.raise_for_status()
+        payload = response.json()
+    except (httpx.HTTPError, ValueError):
+        return None
+    default_branch = payload.get("default_branch")
+    return default_branch if isinstance(default_branch, str) else None
 
 
 def _code_snippet(
@@ -340,6 +410,26 @@ def _first_matching_line(lines: list[str], terms: list[str]) -> int:
         if any(term in normalized_line for term in normalized_terms):
             return index
     return 1
+
+
+def _is_supported_code_path(path: str) -> bool:
+    normalized = path.lower()
+    if any(part in normalized for part in _CODE_PATH_EXCLUDES):
+        return False
+    return normalized.endswith(_CODE_FILE_EXTENSIONS)
+
+
+def _path_score(path: str, terms: list[str], service_hint: str | None) -> int:
+    normalized = path.lower()
+    score = 0
+    for term in terms:
+        if term in normalized:
+            score += 3
+    if service_hint and service_hint.lower() in normalized:
+        score += 5
+    if normalized.startswith(("app/", "src/", "internal/", "pkg/")):
+        score += 2
+    return score
 
 
 def _code_search_terms(fault_description: str, service_hint: str | None) -> list[str]:
@@ -443,6 +533,33 @@ _CODE_SEARCH_TRANSLATIONS = {
     "查询": ["query"],
     "缓存": ["cache"],
 }
+
+_CODE_FILE_EXTENSIONS = (
+    ".go",
+    ".java",
+    ".js",
+    ".jsx",
+    ".kt",
+    ".md",
+    ".php",
+    ".py",
+    ".rb",
+    ".rs",
+    ".sql",
+    ".ts",
+    ".tsx",
+    ".yaml",
+    ".yml",
+)
+
+_CODE_PATH_EXCLUDES = (
+    ".git/",
+    ".venv/",
+    "__pycache__/",
+    "dist/",
+    "node_modules/",
+    "uv.lock",
+)
 
 
 def _int_value(value: Any) -> int | None:
