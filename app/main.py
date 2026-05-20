@@ -10,7 +10,7 @@ from app.config import get_settings
 from app.datasources import build_data_source
 from app.llm import build_llm_client
 from app.reports import ReportGenerator
-from app.storage import JsonDiagnosisStore
+from app.storage import build_diagnosis_store
 from app.webhooks import webhook_router
 from app.webhooks._dedup import DeduplicationService
 from app.workflow import WorkflowEngine
@@ -21,7 +21,7 @@ def create_app() -> FastAPI:
     llm_client = build_llm_client(settings)
     agents = MainAgent(settings, llm_client)
     data_source = build_data_source(settings)
-    store = JsonDiagnosisStore(settings.runtime_dir)
+    store = build_diagnosis_store(settings)
     workflow_engine = WorkflowEngine(
         agents=agents,
         data_source=data_source,
@@ -41,6 +41,14 @@ def create_app() -> FastAPI:
     @app.get("/")
     async def index() -> RedirectResponse:
         return RedirectResponse(url="/ui/")
+
+    @app.on_event("startup")
+    async def initialize_store() -> None:
+        await store.initialize()
+
+    @app.on_event("shutdown")
+    async def close_store() -> None:
+        await store.close()
 
     return app
 

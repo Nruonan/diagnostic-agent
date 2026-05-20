@@ -6,7 +6,7 @@ from app.datasources import DataSource
 from app.llm import LLMConfigurationError, LLMRequestError, LLMResponseError
 from app.schemas.common import RuntimeErrorInfo, utc_now
 from app.schemas.diagnosis import DiagnosisCreate, DiagnosisState, DiagnosisStatus
-from app.storage.json_store import JsonDiagnosisStore
+from app.storage import DiagnosisStore
 
 
 class WorkflowEngine:
@@ -14,7 +14,7 @@ class WorkflowEngine:
         self,
         agents: MainAgent,
         data_source: DataSource,
-        store: JsonDiagnosisStore,
+        store: DiagnosisStore,
         low_confidence_threshold: float,
     ):
         self.agents = agents

@@ -11,6 +11,12 @@ class JsonDiagnosisStore:
         self.base_dir = runtime_dir / "diagnoses"
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
+    async def initialize(self) -> None:
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+
+    async def close(self) -> None:
+        return None
+
     async def save(self, state: DiagnosisState) -> None:
         path = self._path(state.diagnosis_id)
         with path.open("w", encoding="utf-8") as file:
@@ -26,4 +32,3 @@ class JsonDiagnosisStore:
     def _path(self, diagnosis_id: str) -> Path:
         safe_id = diagnosis_id.replace("/", "").replace("\\", "")
         return self.base_dir / f"{safe_id}.json"
-

@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     webhook_dedup_cooldown_seconds: float = Field(default=300.0, gt=0, alias="WEBHOOK_DEDUP_COOLDOWN_SECONDS")
     sample_data_dir: Path = Field(default=Path("sample_data"), alias="SAMPLE_DATA_DIR")
     runtime_dir: Path = Field(default=Path(".runtime"), alias="RUNTIME_DIR")
+    storage_mode: Literal["json", "postgres"] = Field(default="json", alias="STORAGE_MODE")
+    database_url: str = Field(default="", alias="DATABASE_URL")
 
     @field_validator("dashscope_base_url", "openai_base_url", "claude_base_url")
     @classmethod

@@ -15,14 +15,33 @@ services:
       TRACE_API_URL: http://datasource-mock:9000/trace
       GIT_CODE_API_URL: http://datasource-mock:9000/git-code
       RUNTIME_DIR: /app/.runtime
+      STORAGE_MODE: ${STORAGE_MODE:-postgres}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://diagnostic:diagnostic@postgres:5432/diagnostic_agent}
       WEBHOOK_TOKEN: ${WEBHOOK_TOKEN:-}
       WEBHOOK_DEDUP_COOLDOWN_SECONDS: ${WEBHOOK_DEDUP_COOLDOWN_SECONDS:-300}
     ports:
       - "8010:8000"
     depends_on:
-      - datasource-mock
+      datasource-mock:
+        condition: service_started
+      postgres:
+        condition: service_healthy
     volumes:
       - diagnostic_runtime:/app/.runtime
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: diagnostic_agent
+      POSTGRES_USER: diagnostic
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-diagnostic}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - diagnostic_pg_data:/var/lib/postgresql/data
 
   datasource-mock:
     build:
@@ -195,6 +214,7 @@ services:
 
 volumes:
   diagnostic_runtime:
+  diagnostic_pg_data:
   prometheus_data:
   alertmanager_data:
   zabbix_mysql_data:
