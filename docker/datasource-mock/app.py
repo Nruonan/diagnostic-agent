@@ -72,6 +72,14 @@ async def xxl_job(
     return {"items": _fetch_xxl_job_failures(service_hint)}
 
 
+@app.get("/zabbix")
+async def zabbix(
+    fault_description: str = Query(min_length=1),
+    service_hint: str | None = None,
+) -> dict[str, list[dict[str, Any]]]:
+    return {"items": []}
+
+
 @app.get("/trace")
 async def trace(
     fault_description: str = Query(min_length=1),
@@ -87,6 +95,14 @@ async def git_code(
     service_hint: str | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     return {"items": await _search_github_code(fault_description, service_hint)}
+
+
+@app.get("/prometheus")
+async def prometheus(
+    fault_description: str = Query(min_length=1),
+    service_hint: str | None = None,
+) -> dict[str, list[dict[str, Any]]]:
+    return {"items": []}
 
 
 async def _search_elasticsearch(index: str, service_hint: str | None, size: int = 25) -> list[dict[str, Any]]:

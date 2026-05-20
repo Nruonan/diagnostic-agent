@@ -9,7 +9,9 @@ services:
       DATA_SOURCE_MODE: http
       ELK_API_URL: http://datasource-mock:9000/elk
       XXL_JOB_API_URL: http://datasource-mock:9000/xxl-job
+      ZABBIX_API_URL: http://datasource-mock:9000/zabbix
       SLOW_QUERY_API_URL: http://datasource-mock:9000/slow-query
+      PROMETHEUS_API_URL: http://datasource-mock:9000/prometheus
       TRACE_API_URL: http://datasource-mock:9000/trace
       GIT_CODE_API_URL: http://datasource-mock:9000/git-code
       RUNTIME_DIR: /app/.runtime
