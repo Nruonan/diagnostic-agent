@@ -358,6 +358,22 @@ function formatDateTime(value) {
   return date.toLocaleString();
 }
 
+function safeFileName(value) {
+  return String(value || "diagnosis-report").replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+function downloadMarkdownReport(diagnosisId, text) {
+  const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${safeFileName(diagnosisId)}.md`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 async function loadHealth() {
   try {
     renderHealth(await request("/health"));
@@ -493,19 +509,24 @@ async function submitHumanInput(event) {
   const content = nodes.humanInput.value.trim();
   if (!id || !content) return;
   setBusy(true);
+  let submitted = false;
   try {
-    setMessage("补充信息处理中", "is-warn");
-    const data = await request(`/api/v1/diagnoses/${encodeURIComponent(id)}/input`, {
+    setMessage("补充信息提交中", "is-warn");
+    const data = await request(`/api/v1/diagnoses/${encodeURIComponent(id)}/input/async`, {
       method: "POST",
       body: JSON.stringify({ content }),
     });
     nodes.humanInput.value = "";
     renderDiagnosis(data.diagnosis);
-    setMessage("补充信息已处理", "is-ok");
+    setMessage("补充信息已提交，诊断继续运行", "is-warn");
+    setStreamStatus("连接中", "is-warn");
+    connectWorkflowEvents(data.diagnosis.diagnosis_id, { replay: false });
+    await loadSessions();
+    submitted = true;
   } catch (error) {
     setMessage(`提交失败：${error.message}`, "is-danger");
   } finally {
-    setBusy(false);
+    if (!submitted) setBusy(false);
   }
 }
 
@@ -518,7 +539,8 @@ async function loadMarkdownReport() {
       headers: { Accept: "text/plain" },
     });
     nodes.reportBox.textContent = text;
-    setMessage("Markdown 报告已载入", "is-ok");
+    downloadMarkdownReport(id, text);
+    setMessage("Markdown 报告已导出", "is-ok");
   } catch (error) {
     setMessage(`报告加载失败：${error.message}`, "is-danger");
   } finally {

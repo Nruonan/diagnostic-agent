@@ -132,10 +132,21 @@ async def add_human_input(
     payload: HumanInputCreate,
     engine: WorkflowEngine = Depends(get_engine),
 ) -> DiagnosisResponse:
-    state = await engine.get(diagnosis_id)
-    if state.status != DiagnosisStatus.NEED_USER_INPUT:
-        raise HTTPException(status_code=409, detail=f"diagnosis status is {state.status.value}, not need_user_input")
+    await _require_need_user_input(diagnosis_id, engine)
     return DiagnosisResponse(diagnosis=await engine.add_human_input(diagnosis_id, payload.content))
+
+
+@router.post("/api/v1/diagnoses/{diagnosis_id}/input/async", response_model=DiagnosisResponse, status_code=202)
+async def add_human_input_async(
+    diagnosis_id: str,
+    payload: HumanInputCreate,
+    background_tasks: BackgroundTasks,
+    engine: WorkflowEngine = Depends(get_engine),
+) -> DiagnosisResponse:
+    await _require_need_user_input(diagnosis_id, engine)
+    state = await engine.submit_human_input(diagnosis_id, payload.content)
+    background_tasks.add_task(engine.run, diagnosis_id)
+    return DiagnosisResponse(diagnosis=state)
 
 
 @router.get("/api/v1/reports/{diagnosis_id}", response_model=ReportResponse)
@@ -180,3 +191,9 @@ def _resolve_last_event_id(header_value: str | None, query_value: int | None) ->
     if parsed_header is not None:
         return parsed_header
     return query_value
+
+
+async def _require_need_user_input(diagnosis_id: str, engine: WorkflowEngine) -> None:
+    state = await engine.get(diagnosis_id)
+    if state.status != DiagnosisStatus.NEED_USER_INPUT:
+        raise HTTPException(status_code=409, detail=f"diagnosis status is {state.status.value}, not need_user_input")

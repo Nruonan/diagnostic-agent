@@ -74,11 +74,17 @@ class WorkflowEngine:
         return await self._run(state)
 
     async def add_human_input(self, diagnosis_id: str, content: str) -> DiagnosisState:
+        state = await self.submit_human_input(diagnosis_id, content)
+        return await self._run(state)
+
+    async def submit_human_input(self, diagnosis_id: str, content: str) -> DiagnosisState:
         state = await self.store.get(diagnosis_id)
         state.human_inputs.append(content)
         state.need_user_input = []
+        state.status = DiagnosisStatus.RUNNING
+        state.updated_at = utc_now().isoformat()
         await self.store.save(state)
-        return await self._run(state)
+        return state
 
     async def get(self, diagnosis_id: str) -> DiagnosisState:
         return await self.store.get(diagnosis_id)
