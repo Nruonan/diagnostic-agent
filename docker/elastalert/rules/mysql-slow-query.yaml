@@ -1,0 +1,17 @@
+name: mysql_slow_query_webhook
+type: any
+index: mysql-slow-query-*
+
+filter:
+  - range:
+      query_time:
+        gt: 1
+
+alert:
+  - post
+
+http_post_url: http://diagnostic-api:8000/api/v1/webhooks/elastalert
+http_post_static_payload:
+  rule_name: mysql_slow_query_webhook
+  alert_info:
+    severity: high

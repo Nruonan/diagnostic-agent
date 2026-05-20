@@ -6,6 +6,8 @@ from app.config import get_settings
 from app.datasources import build_data_source
 from app.reports import ReportGenerator
 from app.storage import JsonDiagnosisStore
+from app.webhooks import webhook_router
+from app.webhooks._dedup import DeduplicationService
 from app.workflow import WorkflowEngine
 
 
@@ -25,9 +27,10 @@ def create_app() -> FastAPI:
     app.state.settings = settings
     app.state.workflow_engine = workflow_engine
     app.state.report_generator = ReportGenerator()
+    app.state.dedup_service = DeduplicationService(settings.webhook_dedup_cooldown_seconds)
     app.include_router(router)
+    app.include_router(webhook_router)
     return app
 
 
 app = create_app()
-

@@ -1,26 +1,14 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
 
+from app.api.deps import get_engine, get_report_generator, get_settings_from_app
 from app.config import Settings
-from app.reports import ReportGenerator
 from app.schemas.alerts import AlertEventCreate
 from app.schemas.diagnosis import DiagnosisCreate, DiagnosisResponse, DiagnosisStatus, HumanInputCreate
 from app.schemas.reports import ReportResponse
 from app.workflow import WorkflowEngine
 
 router = APIRouter()
-
-
-def get_engine(request: Request) -> WorkflowEngine:
-    return request.app.state.workflow_engine
-
-
-def get_settings_from_app(request: Request) -> Settings:
-    return request.app.state.settings
-
-
-def get_report_generator(request: Request) -> ReportGenerator:
-    return request.app.state.report_generator
 
 
 @router.get("/health")

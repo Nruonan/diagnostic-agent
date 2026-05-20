@@ -1,0 +1,17 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: ai-diagnostic
+  group_by:
+    - alertname
+    - service
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 30m
+
+receivers:
+  - name: ai-diagnostic
+    webhook_configs:
+      - url: http://diagnostic-api:8000/api/v1/webhooks/prometheus
+        send_resolved: true

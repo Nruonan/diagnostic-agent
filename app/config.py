@@ -26,6 +26,8 @@ class Settings(BaseSettings):
 
     agent_timeout_seconds: float = Field(default=120.0, gt=0, alias="AGENT_TIMEOUT_SECONDS")
     low_confidence_threshold: float = Field(default=0.8, ge=0.0, le=1.0, alias="LOW_CONFIDENCE_THRESHOLD")
+    webhook_token: str = Field(default="", alias="WEBHOOK_TOKEN")
+    webhook_dedup_cooldown_seconds: float = Field(default=300.0, gt=0, alias="WEBHOOK_DEDUP_COOLDOWN_SECONDS")
     sample_data_dir: Path = Field(default=Path("sample_data"), alias="SAMPLE_DATA_DIR")
     runtime_dir: Path = Field(default=Path(".runtime"), alias="RUNTIME_DIR")
 
@@ -46,4 +48,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

@@ -1,0 +1,12 @@
+groups:
+  - name: ai-diagnostic-sample
+    rules:
+      - alert: DiagnosticApiWebhookSmokeTest
+        expr: vector(1)
+        for: 1m
+        labels:
+          severity: warning
+          service: diagnostic-api
+        annotations:
+          summary: Diagnostic API webhook smoke test
+          description: This sample alert verifies Prometheus Alertmanager webhook delivery to the diagnostic agent.
