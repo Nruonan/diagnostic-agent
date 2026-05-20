@@ -44,6 +44,23 @@ class TraceSpan(BaseModel):
     status: str
 
 
+class AlertRecord(BaseModel):
+    timestamp: str
+    source: str
+    service: str | None = None
+    severity: str | None = None
+    message: str
+    labels: dict[str, str] = Field(default_factory=dict)
+
+
+class MetricRecord(BaseModel):
+    timestamp: str | None = None
+    service: str | None = None
+    metric: str
+    value: float
+    labels: dict[str, str] = Field(default_factory=dict)
+
+
 class CodeSnippet(BaseModel):
     repository: str
     file_path: str
@@ -57,8 +74,9 @@ class CodeSnippet(BaseModel):
 class CollectedData(BaseModel):
     logs: list[LogRecord] = Field(default_factory=list)
     jobs: list[JobRecord] = Field(default_factory=list)
+    zabbix_events: list[AlertRecord] = Field(default_factory=list)
     slow_queries: list[SlowQueryRecord] = Field(default_factory=list)
+    metrics: list[MetricRecord] = Field(default_factory=list)
     traces: list[TraceSpan] = Field(default_factory=list)
     code_snippets: list[CodeSnippet] = Field(default_factory=list)
     source_errors: list[DataSourceError] = Field(default_factory=list)
-

@@ -5,6 +5,15 @@ from app.schemas.data import CollectedData
 
 
 class DataSource(Protocol):
+    async def collect_error_context(self, fault_description: str, service_hint: str | None = None) -> CollectedData:
+        raise NotImplementedError
+
+    async def collect_sql_context(self, fault_description: str, service_hint: str | None = None) -> CollectedData:
+        raise NotImplementedError
+
+    async def collect_root_context(self, fault_description: str, service_hint: str | None = None) -> CollectedData:
+        raise NotImplementedError
+
     async def collect(self, fault_description: str, service_hint: str | None = None) -> CollectedData:
         raise NotImplementedError
 
@@ -18,4 +27,3 @@ def build_data_source(settings: Settings) -> DataSource:
     from app.datasources.sample import SampleDataSource
 
     return SampleDataSource(settings.sample_data_path())
-

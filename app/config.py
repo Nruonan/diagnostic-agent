@@ -20,7 +20,9 @@ class Settings(BaseSettings):
     data_source_mode: Literal["sample", "http"] = Field(default="sample", alias="DATA_SOURCE_MODE")
     elk_api_url: str = Field(default="", alias="ELK_API_URL")
     xxl_job_api_url: str = Field(default="", alias="XXL_JOB_API_URL")
+    zabbix_api_url: str = Field(default="", alias="ZABBIX_API_URL")
     slow_query_api_url: str = Field(default="", alias="SLOW_QUERY_API_URL")
+    prometheus_api_url: str = Field(default="", alias="PROMETHEUS_API_URL")
     trace_api_url: str = Field(default="", alias="TRACE_API_URL")
     git_code_api_url: str = Field(default="", alias="GIT_CODE_API_URL")
 

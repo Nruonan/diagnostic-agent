@@ -44,6 +44,12 @@ class PlanningOutput(BaseModel):
     tasks: list[TaskItem]
     estimated_time: str
     focus_services: list[str] = Field(default_factory=list)
+    missing_information: list[str] = Field(default_factory=list)
+
+    @field_validator("focus_services", "missing_information", mode="before")
+    @classmethod
+    def normalize_string_fields(cls, value: Any) -> list[str]:
+        return normalize_string_list(value)
 
 
 class ErrorItem(BaseModel):
@@ -65,8 +71,9 @@ class ErrorAnalysisOutput(BaseModel):
     timeline: list[str]
     suspects: list[str]
     summary: str
+    missing_information: list[str] = Field(default_factory=list)
 
-    @field_validator("timeline", "suspects", mode="before")
+    @field_validator("timeline", "suspects", "missing_information", mode="before")
     @classmethod
     def normalize_string_fields(cls, value: Any) -> list[str]:
         return normalize_string_list(value)
@@ -91,8 +98,9 @@ class SlowSqlAnalysisOutput(BaseModel):
     slow_queries: list[SlowQueryFinding]
     optimizations: list[str]
     summary: str
+    missing_information: list[str] = Field(default_factory=list)
 
-    @field_validator("optimizations", mode="before")
+    @field_validator("optimizations", "missing_information", mode="before")
     @classmethod
     def normalize_optimizations(cls, value: Any) -> list[str]:
         return normalize_string_list(value)

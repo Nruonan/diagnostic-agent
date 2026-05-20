@@ -12,9 +12,9 @@ Given a fault description, output strict JSON with:
 - tasks: ordered diagnostic tasks with id, name, priority 1-5, sources, dependencies, and reason
 - estimated_time: concise estimate
 - focus_services: likely affected services
+- missing_information: questions to ask before collecting data only when the fault description is too vague to choose tools or scope
 Use data sources from this list only: ELK, XXL-Job, SlowQuery, Trace, GitCode.
 Return JSON only.
 """
         payload = {"fault_description": fault_description, "service_hint": service_hint}
         return await self.with_timeout(self.client.complete_json(system_prompt, payload, PlanningOutput))
-

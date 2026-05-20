@@ -1,4 +1,3 @@
-import asyncio
 from typing import Any
 from uuid import uuid4
 
@@ -69,36 +68,11 @@ class WorkflowEngine:
         await self.store.save(state)
 
         try:
-            state.planning = await self.agents.planning.run(state.fault_description, state.service_hint)
-            state.collected_data = await self.data_source.collect(state.fault_description, state.service_hint)
-
-            error_task = self.agents.error_analysis.run(
-                state.fault_description,
-                state.collected_data.logs,
-                state.collected_data.jobs,
+            state = await self.agents.run(
+                state=state,
+                data_source=self.data_source,
+                low_confidence_threshold=self.low_confidence_threshold,
             )
-            sql_task = self.agents.slow_sql.run(state.fault_description, state.collected_data.slow_queries)
-            state.error_analysis, state.slow_sql_analysis = await asyncio.gather(error_task, sql_task)
-
-            state.root_cause = await self.agents.root_cause.run(
-                fault_description=state.fault_description,
-                planning=state.planning,
-                error_analysis=state.error_analysis,
-                slow_sql_analysis=state.slow_sql_analysis,
-                traces=state.collected_data.traces,
-                code_snippets=state.collected_data.code_snippets,
-                source_errors=[error.model_dump(mode="json") for error in state.collected_data.source_errors],
-                human_inputs=state.human_inputs,
-            )
-
-            if state.root_cause.confidence < self.low_confidence_threshold:
-                state.status = DiagnosisStatus.NEED_USER_INPUT
-                state.need_user_input = state.root_cause.missing_information or [
-                    "请补充更精确的故障时间窗口、影响服务、关键错误日志或最近变更。"
-                ]
-            else:
-                state.status = DiagnosisStatus.COMPLETED
-                state.need_user_input = []
         except (DashScopeConfigurationError, DashScopeRequestError, DashScopeResponseError) as exc:
             state.status = DiagnosisStatus.FAILED
             state.errors.append(

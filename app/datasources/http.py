@@ -6,7 +6,7 @@ from pydantic import ValidationError
 
 from app.config import Settings
 from app.schemas.common import DataSourceError
-from app.schemas.data import CodeSnippet, CollectedData, JobRecord, LogRecord, SlowQueryRecord, TraceSpan
+from app.schemas.data import AlertRecord, CodeSnippet, CollectedData, JobRecord, LogRecord, MetricRecord, SlowQueryRecord, TraceSpan
 
 
 class HttpDataSource:
@@ -14,6 +14,10 @@ class HttpDataSource:
         self.settings = settings
 
     async def collect(self, fault_description: str, service_hint: str | None = None) -> CollectedData:
+        error_context, sql_context, root_context = await self._collect_contexts(fault_description, service_hint)
+        return self._merge_contexts(error_context, sql_context, root_context)
+
+    async def collect_error_context(self, fault_description: str, service_hint: str | None = None) -> CollectedData:
         params = {"fault_description": fault_description}
         if service_hint:
             params["service_hint"] = service_hint
@@ -36,6 +40,24 @@ class HttpDataSource:
                 JobRecord.model_validate,
                 collected,
             )
+            collected.zabbix_events = await self._fetch_items(
+                client,
+                "zabbix",
+                self.settings.zabbix_api_url,
+                params,
+                AlertRecord.model_validate,
+                collected,
+                required=False,
+            )
+        return collected
+
+    async def collect_sql_context(self, fault_description: str, service_hint: str | None = None) -> CollectedData:
+        params = {"fault_description": fault_description}
+        if service_hint:
+            params["service_hint"] = service_hint
+
+        collected = CollectedData()
+        async with httpx.AsyncClient(timeout=30.0) as client:
             collected.slow_queries = await self._fetch_items(
                 client,
                 "slow_query",
@@ -44,6 +66,24 @@ class HttpDataSource:
                 SlowQueryRecord.model_validate,
                 collected,
             )
+            collected.metrics = await self._fetch_items(
+                client,
+                "prometheus",
+                self.settings.prometheus_api_url,
+                params,
+                MetricRecord.model_validate,
+                collected,
+                required=False,
+            )
+        return collected
+
+    async def collect_root_context(self, fault_description: str, service_hint: str | None = None) -> CollectedData:
+        params = {"fault_description": fault_description}
+        if service_hint:
+            params["service_hint"] = service_hint
+
+        collected = CollectedData()
+        async with httpx.AsyncClient(timeout=30.0) as client:
             collected.traces = await self._fetch_items(
                 client,
                 "trace",
@@ -62,6 +102,30 @@ class HttpDataSource:
             )
         return collected
 
+    async def _collect_contexts(
+        self,
+        fault_description: str,
+        service_hint: str | None,
+    ) -> tuple[CollectedData, CollectedData, CollectedData]:
+        return (
+            await self.collect_error_context(fault_description, service_hint),
+            await self.collect_sql_context(fault_description, service_hint),
+            await self.collect_root_context(fault_description, service_hint),
+        )
+
+    def _merge_contexts(self, *contexts: CollectedData) -> CollectedData:
+        collected = CollectedData()
+        for context in contexts:
+            collected.logs.extend(context.logs)
+            collected.jobs.extend(context.jobs)
+            collected.zabbix_events.extend(context.zabbix_events)
+            collected.slow_queries.extend(context.slow_queries)
+            collected.metrics.extend(context.metrics)
+            collected.traces.extend(context.traces)
+            collected.code_snippets.extend(context.code_snippets)
+            collected.source_errors.extend(context.source_errors)
+        return collected
+
     async def _fetch_items(
         self,
         client: httpx.AsyncClient,
@@ -70,9 +134,11 @@ class HttpDataSource:
         params: dict[str, str],
         validator: Callable[[Any], Any],
         collected: CollectedData,
+        required: bool = True,
     ) -> list[Any]:
         if not url:
-            collected.source_errors.append(DataSourceError(source=source, message=f"{source} URL is not configured"))
+            if required:
+                collected.source_errors.append(DataSourceError(source=source, message=f"{source} URL is not configured"))
             return []
 
         try:
@@ -110,4 +176,3 @@ class HttpDataSource:
                 if isinstance(value, list):
                     return value
         return []
-
