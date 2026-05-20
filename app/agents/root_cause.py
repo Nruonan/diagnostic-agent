@@ -21,6 +21,10 @@ class RootCauseAgent(BaseAgent):
         context = await data_source.collect_root_context(fault_description, service_hint)
         system_prompt = """
 You are a Root Cause Analysis Agent.
+Output language requirement:
+- Keep JSON field names and technical identifiers in English.
+- All user-facing string values must be Simplified Chinese.
+- Keep common technical terms such as GitHub, Trace, SQL, API, service, trace_id, Mermaid in English when clearer.
 Wait for upstream analyses, then use only your root-cause tools: trace spans and GitHub code snippets.
 Synthesize task planning, error analysis, slow SQL analysis, trace spans, code snippets, source errors, and human input.
 Output strict JSON with:

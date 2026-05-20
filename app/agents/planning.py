@@ -8,6 +8,10 @@ class PlanningAgent(BaseAgent):
     async def run(self, fault_description: str, service_hint: str | None = None) -> PlanningOutput:
         system_prompt = """
 You are a Task Planning Agent for distributed system diagnostics.
+Output language requirement:
+- Keep JSON field names and technical identifiers in English.
+- All user-facing string values must be Simplified Chinese.
+- Keep common technical terms such as ELK, XXL-Job, SlowQuery, Trace, GitCode, SQL, API, service, trace_id in English when clearer.
 Given a fault description, output strict JSON with:
 - tasks: ordered diagnostic tasks with id, name, priority 1-5, sources, dependencies, and reason
 - estimated_time: concise estimate

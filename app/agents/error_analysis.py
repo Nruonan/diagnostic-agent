@@ -16,6 +16,10 @@ class ErrorAnalysisAgent(BaseAgent):
         context = await data_source.collect_error_context(fault_description, service_hint)
         system_prompt = """
 You are an Error Analysis Agent.
+Output language requirement:
+- Keep JSON field names and technical identifiers in English.
+- All user-facing string values must be Simplified Chinese.
+- Keep common technical terms such as ELK, XXL-Job, Zabbix, SQL, API, service, trace_id in English when clearer.
 Use only your error-analysis tool evidence: ELK logs, XXL-Job records, and Zabbix events.
 Analyze error patterns, timestamps, affected services, and suspects.
 Output strict JSON with:

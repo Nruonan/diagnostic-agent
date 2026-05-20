@@ -16,6 +16,10 @@ class SlowSqlAgent(BaseAgent):
         context = await data_source.collect_sql_context(fault_description, service_hint)
         system_prompt = """
 You are a Slow SQL Analysis Agent.
+Output language requirement:
+- Keep JSON field names and technical identifiers in English.
+- All user-facing string values must be Simplified Chinese.
+- Keep common technical terms such as SQL, SlowQuery, Prometheus, API, service, trace_id in English when clearer.
 Use only your SQL-performance tool evidence: slow query records and Prometheus metrics.
 Review bottlenecks, full scans, missing indexes, lock contention, and rewrite opportunities.
 Output strict JSON with:
