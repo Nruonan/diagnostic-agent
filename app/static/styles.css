@@ -132,6 +132,93 @@ textarea {
   gap: 10px;
 }
 
+.session-section {
+  display: grid;
+  gap: 10px;
+}
+
+.compact-head {
+  margin-bottom: 0;
+}
+
+.compact-head button {
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.session-list {
+  display: grid;
+  gap: 8px;
+  max-height: 290px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.session-empty {
+  margin: 0;
+  border: 1px dashed var(--line-strong);
+  border-radius: 7px;
+  padding: 10px;
+}
+
+.session-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+  width: 100%;
+  min-height: 0;
+  border-color: var(--line);
+  background: var(--surface-raised);
+  padding: 10px;
+  text-align: left;
+}
+
+.session-item:hover {
+  background: var(--blue-soft);
+}
+
+.session-item.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.session-item span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.session-item strong,
+.session-item em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-item strong {
+  color: var(--text-strong);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.session-item em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 520;
+}
+
+.session-item small {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 760;
+}
+
 .field {
   display: grid;
   gap: 6px;

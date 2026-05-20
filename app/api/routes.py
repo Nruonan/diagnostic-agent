@@ -101,11 +101,12 @@ async def get_session(
 async def stream_diagnosis_events(
     diagnosis_id: str,
     request: Request,
-    last_event_id: Annotated[str | None, Header(alias="Last-Event-ID")] = None,
+    last_event_id: int | None = None,
+    last_event_id_header: Annotated[str | None, Header(alias="Last-Event-ID")] = None,
     event_bus: WorkflowEventBus = Depends(get_event_bus),
 ) -> StreamingResponse:
     async def event_stream():
-        async for event in event_bus.subscribe(diagnosis_id, _parse_last_event_id(last_event_id)):
+        async for event in event_bus.subscribe(diagnosis_id, _resolve_last_event_id(last_event_id_header, last_event_id)):
             if await request.is_disconnected():
                 break
             yield (
@@ -172,3 +173,10 @@ def _parse_last_event_id(value: str | None) -> int | None:
         return int(value)
     except ValueError:
         return None
+
+
+def _resolve_last_event_id(header_value: str | None, query_value: int | None) -> int | None:
+    parsed_header = _parse_last_event_id(header_value)
+    if parsed_header is not None:
+        return parsed_header
+    return query_value

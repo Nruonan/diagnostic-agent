@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>AI Diagnostic Agent</title>
-    <link rel="stylesheet" href="/ui/styles.css?v=sse-llm-resilience-20260520" />
+    <link rel="stylesheet" href="/ui/styles.css?v=persistent-sessions-20260520" />
   </head>
   <body>
     <main class="shell">
@@ -41,6 +41,16 @@
 
             <button class="primary" type="submit">新建诊断</button>
           </form>
+
+          <div class="divider"></div>
+
+          <section class="session-section">
+            <div class="section-head compact-head">
+              <h2>历史会话</h2>
+              <button id="refreshSessions" type="button" data-allow-busy="true">刷新</button>
+            </div>
+            <div id="sessionList" class="session-list"></div>
+          </section>
 
           <div class="divider"></div>
 
@@ -196,6 +206,6 @@
       </section>
     </main>
 
-    <script src="/ui/app.js?v=sse-llm-resilience-20260520" defer></script>
+    <script src="/ui/app.js?v=persistent-sessions-20260520" defer></script>
   </body>
 </html>

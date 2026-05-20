@@ -2,6 +2,9 @@ const state = {
   diagnosis: null,
   busy: false,
   eventSource: null,
+  reconnectTimer: null,
+  lastEventId: null,
+  sessions: [],
 };
 
 const nodes = {
@@ -11,6 +14,8 @@ const nodes = {
   diagnosisForm: document.querySelector("#diagnosisForm"),
   lookupForm: document.querySelector("#lookupForm"),
   humanInputForm: document.querySelector("#humanInputForm"),
+  refreshSessions: document.querySelector("#refreshSessions"),
+  sessionList: document.querySelector("#sessionList"),
   faultDescription: document.querySelector("#faultDescription"),
   serviceHint: document.querySelector("#serviceHint"),
   diagnosisId: document.querySelector("#diagnosisId"),
@@ -61,7 +66,7 @@ async function request(path, options = {}) {
 
 function setBusy(value) {
   state.busy = value;
-  document.querySelectorAll("button").forEach((button) => {
+  document.querySelectorAll("button:not([data-allow-busy])").forEach((button) => {
     button.disabled = value;
   });
 }
@@ -82,6 +87,7 @@ function renderHealth(data) {
 
 function renderDiagnosis(diagnosis) {
   state.diagnosis = diagnosis;
+  localStorage.setItem("activeDiagnosisId", diagnosis.diagnosis_id);
   nodes.diagnosisId.value = diagnosis.diagnosis_id;
   nodes.activeId.textContent = diagnosis.diagnosis_id;
   nodes.statusValue.textContent = diagnosis.status || "--";
@@ -105,6 +111,7 @@ function renderDiagnosis(diagnosis) {
   renderSourceCounts(diagnosis.collected_data);
   renderCollectedDetails(diagnosis.collected_data);
   nodes.reportBox.textContent = JSON.stringify(diagnosis, null, 2);
+  highlightActiveSession();
 }
 
 function statusClass(status) {
@@ -339,11 +346,111 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+function shortId(value) {
+  if (!value) return "--";
+  return value.length > 8 ? value.slice(0, 8) : value;
+}
+
+function formatDateTime(value) {
+  if (!value) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+}
+
 async function loadHealth() {
   try {
     renderHealth(await request("/health"));
   } catch (error) {
     setMessage(`API 异常：${error.message}`, "is-danger");
+  }
+}
+
+async function loadSessions() {
+  try {
+    const data = await request("/api/v1/sessions?limit=20");
+    state.sessions = data.sessions || [];
+    renderSessions();
+  } catch (error) {
+    nodes.sessionList.innerHTML = "";
+    const empty = document.createElement("p");
+    empty.className = "empty session-empty";
+    empty.textContent = `会话加载失败：${error.message}`;
+    nodes.sessionList.appendChild(empty);
+  }
+}
+
+function renderSessions() {
+  nodes.sessionList.innerHTML = "";
+  if (!state.sessions.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty session-empty";
+    empty.textContent = "暂无历史会话";
+    nodes.sessionList.appendChild(empty);
+    return;
+  }
+
+  for (const session of state.sessions) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "session-item";
+    button.dataset.sessionId = session.session_id;
+    button.dataset.allowBusy = "true";
+    button.innerHTML = `
+      <span>
+        <strong>${escapeHtml(session.title || session.diagnosis_id)}</strong>
+        <em>${escapeHtml(shortId(session.diagnosis_id))} · ${escapeHtml(formatDateTime(session.updated_at))}</em>
+      </span>
+      <small class="${statusClass(session.status)}">${escapeHtml(session.status || "--")}</small>
+    `;
+    button.addEventListener("click", () => selectSession(session));
+    nodes.sessionList.appendChild(button);
+  }
+  highlightActiveSession();
+}
+
+function highlightActiveSession() {
+  const activeId = state.diagnosis?.diagnosis_id;
+  for (const item of nodes.sessionList.querySelectorAll(".session-item")) {
+    item.classList.toggle("is-active", item.dataset.sessionId === activeId);
+  }
+}
+
+async function selectSession(session) {
+  await loadDiagnosisById(session.diagnosis_id, {
+    replayEvents: true,
+    message: "历史会话已恢复",
+  });
+}
+
+async function restoreActiveDiagnosis() {
+  const activeId = localStorage.getItem("activeDiagnosisId");
+  if (!activeId) return;
+  await loadDiagnosisById(activeId, {
+    replayEvents: true,
+    message: "上次诊断已恢复",
+    silentNotFound: true,
+  });
+}
+
+async function loadDiagnosisById(id, options = {}) {
+  if (!id) return;
+  setBusy(true);
+  try {
+    clearWorkflowEvents();
+    const data = await request(`/api/v1/diagnoses/${encodeURIComponent(id)}`);
+    renderDiagnosis(data.diagnosis);
+    setMessage(options.message || "诊断已载入", "is-ok");
+    if (options.replayEvents) {
+      state.lastEventId = null;
+      connectWorkflowEvents(data.diagnosis.diagnosis_id, { replay: true });
+    }
+  } catch (error) {
+    if (!options.silentNotFound) {
+      setMessage(`查询失败：${error.message}`, "is-danger");
+    }
+  } finally {
+    setBusy(false);
   }
 }
 
@@ -363,8 +470,10 @@ async function createDiagnosis(event) {
       body: JSON.stringify(payload),
     });
     renderDiagnosis(data.diagnosis);
+    await loadSessions();
     setMessage("诊断运行中", "is-warn");
-    connectWorkflowEvents(data.diagnosis.diagnosis_id);
+    state.lastEventId = null;
+    connectWorkflowEvents(data.diagnosis.diagnosis_id, { replay: true });
   } catch (error) {
     setMessage(`诊断失败：${error.message}`, "is-danger");
     setBusy(false);
@@ -375,16 +484,7 @@ async function lookupDiagnosis(event) {
   event.preventDefault();
   const id = nodes.diagnosisId.value.trim();
   if (!id) return;
-  setBusy(true);
-  try {
-    const data = await request(`/api/v1/diagnoses/${encodeURIComponent(id)}`);
-    renderDiagnosis(data.diagnosis);
-    setMessage("诊断已载入", "is-ok");
-  } catch (error) {
-    setMessage(`查询失败：${error.message}`, "is-danger");
-  } finally {
-    setBusy(false);
-  }
+  await loadDiagnosisById(id, { replayEvents: true });
 }
 
 async function submitHumanInput(event) {
@@ -426,9 +526,10 @@ async function loadMarkdownReport() {
   }
 }
 
-function connectWorkflowEvents(diagnosisId) {
+function connectWorkflowEvents(diagnosisId, options = {}) {
   closeWorkflowEvents();
-  const source = new EventSource(`/api/v1/diagnoses/${encodeURIComponent(diagnosisId)}/events`);
+  const url = workflowEventsUrl(diagnosisId, options.replay ? null : state.lastEventId);
+  const source = new EventSource(url);
   state.eventSource = source;
   setStreamStatus("已连接", "is-ok");
 
@@ -437,15 +538,39 @@ function connectWorkflowEvents(diagnosisId) {
   }
 
   source.onerror = () => {
+    if (state.eventSource !== source) return;
     setStreamStatus("连接重试中", "is-warn");
+    source.close();
+    state.eventSource = null;
+    scheduleWorkflowReconnect(diagnosisId);
   };
 }
 
 function closeWorkflowEvents() {
+  if (state.reconnectTimer) {
+    clearTimeout(state.reconnectTimer);
+    state.reconnectTimer = null;
+  }
   if (state.eventSource) {
     state.eventSource.close();
     state.eventSource = null;
   }
+}
+
+function workflowEventsUrl(diagnosisId, lastEventId) {
+  const url = new URL(`/api/v1/diagnoses/${encodeURIComponent(diagnosisId)}/events`, window.location.origin);
+  if (lastEventId) {
+    url.searchParams.set("last_event_id", String(lastEventId));
+  }
+  return url.toString();
+}
+
+function scheduleWorkflowReconnect(diagnosisId) {
+  if (state.reconnectTimer || isTerminalStatus(state.diagnosis?.status)) return;
+  state.reconnectTimer = window.setTimeout(() => {
+    state.reconnectTimer = null;
+    connectWorkflowEvents(diagnosisId, { replay: false });
+  }, 1500);
 }
 
 function workflowEventNames() {
@@ -462,6 +587,8 @@ function workflowEventNames() {
 
 async function handleWorkflowEvent(message) {
   const event = JSON.parse(message.data);
+  state.lastEventId = event.event_id;
+  localStorage.setItem(`lastEventId:${event.diagnosis_id}`, String(event.event_id));
   appendWorkflowEvent(event);
   applyWorkflowEvent(event);
 
@@ -472,6 +599,7 @@ async function handleWorkflowEvent(message) {
     try {
       const data = await request(`/api/v1/diagnoses/${encodeURIComponent(event.diagnosis_id)}`);
       renderDiagnosis(data.diagnosis);
+      await loadSessions();
       setMessage(`诊断状态：${data.diagnosis.status}`, terminalTone(data.diagnosis.status));
     } catch (error) {
       setMessage(`最终状态加载失败：${error.message}`, "is-danger");
@@ -518,9 +646,15 @@ function terminalTone(status) {
   return "";
 }
 
+function isTerminalStatus(status) {
+  return ["completed", "failed", "need_user_input"].includes(status);
+}
+
 nodes.diagnosisForm.addEventListener("submit", createDiagnosis);
 nodes.lookupForm.addEventListener("submit", lookupDiagnosis);
 nodes.humanInputForm.addEventListener("submit", submitHumanInput);
 nodes.loadMarkdown.addEventListener("click", loadMarkdownReport);
+nodes.refreshSessions.addEventListener("click", loadSessions);
 
 loadHealth();
+loadSessions().then(() => restoreActiveDiagnosis());
