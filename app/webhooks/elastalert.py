@@ -11,7 +11,7 @@ from app.webhooks._shared import (
     WebhookAcceptedResponse,
     accepted_response,
     create_webhook_diagnosis,
-    ensure_dashscope_configured,
+    ensure_llm_configured,
     first_non_empty,
     normalize_severity,
     stringify_mapping,
@@ -43,7 +43,7 @@ async def ingest_elastalert(
 ) -> WebhookAcceptedResponse:
     rule_name = first_non_empty(payload.rule_name, _extra(payload, "rule_name"), _extra(payload, "rule"), "ElastAlert alert")
     match_body = payload.match_body or _match_from_extra(payload)
-    ensure_dashscope_configured(settings)
+    ensure_llm_configured(settings)
     fingerprint = dedup.fingerprint("elastalert", [rule_name, dedup.fingerprint("elastalert-match", match_body)])
     if await dedup.is_duplicate(fingerprint):
         return accepted_response(response, [], deduplicated=1)

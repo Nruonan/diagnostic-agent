@@ -59,9 +59,12 @@ def truncate(value: str, limit: int) -> str:
     return value if len(value) <= limit else f"{value[: limit - 3]}..."
 
 
-def ensure_dashscope_configured(settings: Settings) -> None:
-    if not settings.dashscope_configured():
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="DASHSCOPE_API_KEY is not configured")
+def ensure_llm_configured(settings: Settings) -> None:
+    if not settings.llm_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=settings.llm_missing_configuration_message(),
+        )
 
 
 async def create_webhook_diagnosis(
@@ -70,7 +73,7 @@ async def create_webhook_diagnosis(
     engine: WorkflowEngine,
     settings: Settings,
 ) -> str:
-    ensure_dashscope_configured(settings)
+    ensure_llm_configured(settings)
     state = await engine.create(
         alert.to_diagnosis_create(),
         trigger_source="webhook",

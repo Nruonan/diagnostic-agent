@@ -1,7 +1,7 @@
 [project]
 name = "ai-diagnostic-agent"
 version = "0.1.0"
-description = "DashScope-powered distributed system fault diagnosis backend"
+description = "Multi-provider LLM distributed system fault diagnosis backend"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115.0",
@@ -19,4 +19,3 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["app*"]
-

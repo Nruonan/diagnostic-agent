@@ -11,7 +11,7 @@ from app.webhooks._shared import (
     WebhookAcceptedResponse,
     accepted_response,
     create_webhook_diagnosis,
-    ensure_dashscope_configured,
+    ensure_llm_configured,
     first_non_empty,
     normalize_severity,
     stringify_mapping,
@@ -60,7 +60,7 @@ async def ingest_prometheus(
     if not firing_alerts:
         return accepted_response(response, [])
 
-    ensure_dashscope_configured(settings)
+    ensure_llm_configured(settings)
     for alert in firing_alerts:
         labels = stringify_mapping(alert.labels)
         annotations = stringify_mapping(alert.annotations)

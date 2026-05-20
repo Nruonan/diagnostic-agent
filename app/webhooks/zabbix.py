@@ -11,7 +11,7 @@ from app.webhooks._shared import (
     WebhookAcceptedResponse,
     accepted_response,
     create_webhook_diagnosis,
-    ensure_dashscope_configured,
+    ensure_llm_configured,
     first_non_empty,
     normalize_severity,
     stringify_mapping,
@@ -45,7 +45,7 @@ async def ingest_zabbix(
     if _is_resolved(payload.status):
         return accepted_response(response, [])
 
-    ensure_dashscope_configured(settings)
+    ensure_llm_configured(settings)
     fingerprint = dedup.fingerprint("zabbix", [payload.event_id, payload.host, payload.trigger_name])
     if await dedup.is_duplicate(fingerprint):
         return accepted_response(response, [], deduplicated=1)

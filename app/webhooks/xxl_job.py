@@ -10,7 +10,7 @@ from app.webhooks._shared import (
     WebhookAcceptedResponse,
     accepted_response,
     create_webhook_diagnosis,
-    ensure_dashscope_configured,
+    ensure_llm_configured,
     first_non_empty,
     normalize_severity,
     stringify_mapping,
@@ -40,7 +40,7 @@ async def ingest_xxl_job(
         if isinstance(record, dict) and _int_value(record, "handle_code", "handleCode", "code") != 200
     ]
     if failing_records:
-        ensure_dashscope_configured(settings)
+        ensure_llm_configured(settings)
 
     for record in failing_records:
         handle_code = _int_value(record, "handle_code", "handleCode", "code")

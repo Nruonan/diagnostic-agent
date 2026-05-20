@@ -9,6 +9,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
+    llm_provider: Literal["dashscope", "openai", "claude"] = Field(default="dashscope", alias="LLM_PROVIDER")
+
     dashscope_api_key: str = Field(default="", alias="DASHSCOPE_API_KEY")
     dashscope_model: str = Field(default="qwen-plus", alias="DASHSCOPE_MODEL")
     dashscope_base_url: str = Field(
@@ -16,6 +18,18 @@ class Settings(BaseSettings):
         alias="DASHSCOPE_BASE_URL",
     )
     dashscope_timeout_seconds: float = Field(default=60.0, gt=0, alias="DASHSCOPE_TIMEOUT_SECONDS")
+
+    openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
+    openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")
+    openai_base_url: str = Field(default="https://api.openai.com/v1", alias="OPENAI_BASE_URL")
+    openai_timeout_seconds: float = Field(default=60.0, gt=0, alias="OPENAI_TIMEOUT_SECONDS")
+
+    claude_api_key: str = Field(default="", alias="CLAUDE_API_KEY")
+    claude_model: str = Field(default="claude-sonnet-4-5", alias="CLAUDE_MODEL")
+    claude_base_url: str = Field(default="https://api.anthropic.com/v1", alias="CLAUDE_BASE_URL")
+    claude_api_version: str = Field(default="2023-06-01", alias="CLAUDE_API_VERSION")
+    claude_timeout_seconds: float = Field(default=60.0, gt=0, alias="CLAUDE_TIMEOUT_SECONDS")
+    claude_max_tokens: int = Field(default=4096, gt=0, alias="CLAUDE_MAX_TOKENS")
 
     data_source_mode: Literal["sample", "http"] = Field(default="sample", alias="DATA_SOURCE_MODE")
     elk_api_url: str = Field(default="", alias="ELK_API_URL")
@@ -33,15 +47,39 @@ class Settings(BaseSettings):
     sample_data_dir: Path = Field(default=Path("sample_data"), alias="SAMPLE_DATA_DIR")
     runtime_dir: Path = Field(default=Path(".runtime"), alias="RUNTIME_DIR")
 
-    @field_validator("dashscope_base_url")
+    @field_validator("dashscope_base_url", "openai_base_url", "claude_base_url")
     @classmethod
-    def validate_dashscope_url(cls, value: str) -> str:
+    def validate_llm_url(cls, value: str) -> str:
         if not value.startswith(("http://", "https://")):
-            raise ValueError("DASHSCOPE_BASE_URL must start with http:// or https://")
+            raise ValueError("LLM base URLs must start with http:// or https://")
         return value
 
     def dashscope_configured(self) -> bool:
         return bool(self.dashscope_api_key.strip())
+
+    def openai_configured(self) -> bool:
+        return bool(self.openai_api_key.strip())
+
+    def claude_configured(self) -> bool:
+        return bool(self.claude_api_key.strip())
+
+    def llm_configured(self) -> bool:
+        if self.llm_provider == "dashscope":
+            return self.dashscope_configured()
+        if self.llm_provider == "openai":
+            return self.openai_configured()
+        if self.llm_provider == "claude":
+            return self.claude_configured()
+        return False
+
+    def llm_missing_configuration_message(self) -> str:
+        if self.llm_provider == "dashscope":
+            return "DASHSCOPE_API_KEY is not configured"
+        if self.llm_provider == "openai":
+            return "OPENAI_API_KEY is not configured"
+        if self.llm_provider == "claude":
+            return "CLAUDE_API_KEY is not configured"
+        return f"Unsupported LLM_PROVIDER: {self.llm_provider}"
 
     def sample_data_path(self) -> Path:
         return self.sample_data_dir

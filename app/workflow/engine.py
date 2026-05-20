@@ -2,8 +2,8 @@ from typing import Any
 from uuid import uuid4
 
 from app.agents import MainAgent
-from app.dashscope_client import DashScopeConfigurationError, DashScopeRequestError, DashScopeResponseError
 from app.datasources import DataSource
+from app.llm import LLMConfigurationError, LLMRequestError, LLMResponseError
 from app.schemas.common import RuntimeErrorInfo, utc_now
 from app.schemas.diagnosis import DiagnosisCreate, DiagnosisState, DiagnosisStatus
 from app.storage.json_store import JsonDiagnosisStore
@@ -73,10 +73,10 @@ class WorkflowEngine:
                 data_source=self.data_source,
                 low_confidence_threshold=self.low_confidence_threshold,
             )
-        except (DashScopeConfigurationError, DashScopeRequestError, DashScopeResponseError) as exc:
+        except (LLMConfigurationError, LLMRequestError, LLMResponseError) as exc:
             state.status = DiagnosisStatus.FAILED
             state.errors.append(
-                RuntimeErrorInfo(stage="dashscope", message=str(exc), recoverable=isinstance(exc, DashScopeRequestError))
+                RuntimeErrorInfo(stage="llm", message=str(exc), recoverable=isinstance(exc, LLMRequestError))
             )
         except Exception as exc:
             state.status = DiagnosisStatus.FAILED

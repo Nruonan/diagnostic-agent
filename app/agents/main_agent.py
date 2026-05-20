@@ -5,15 +5,14 @@ from app.agents.planning import PlanningAgent
 from app.agents.root_cause import RootCauseAgent
 from app.agents.slow_sql import SlowSqlAgent
 from app.config import Settings
-from app.dashscope_client import DashScopeClient
 from app.datasources import DataSource
+from app.llm import LLMClient
 from app.schemas.data import CollectedData
 from app.schemas.diagnosis import DiagnosisState, DiagnosisStatus
 
 
 class MainAgent:
-    def __init__(self, settings: Settings):
-        client = DashScopeClient(settings)
+    def __init__(self, settings: Settings, client: LLMClient):
         self.planning = PlanningAgent(client, settings)
         self.error_analysis = ErrorAnalysisAgent(client, settings)
         self.slow_sql = SlowSqlAgent(client, settings)

@@ -16,6 +16,8 @@ router = APIRouter()
 async def health(settings: Settings = Depends(get_settings_from_app)) -> dict:
     return {
         "status": "ok",
+        "llm_provider": settings.llm_provider,
+        "llm_configured": settings.llm_configured(),
         "dashscope_configured": settings.dashscope_configured(),
         "data_source_mode": settings.data_source_mode,
     }
@@ -27,8 +29,8 @@ async def create_diagnosis(
     engine: WorkflowEngine = Depends(get_engine),
     settings: Settings = Depends(get_settings_from_app),
 ) -> DiagnosisResponse:
-    if not settings.dashscope_configured():
-        raise HTTPException(status_code=503, detail="DASHSCOPE_API_KEY is not configured")
+    if not settings.llm_configured():
+        raise HTTPException(status_code=503, detail=settings.llm_missing_configuration_message())
     return DiagnosisResponse(diagnosis=await engine.start(payload))
 
 
@@ -39,8 +41,8 @@ async def ingest_alert(
     engine: WorkflowEngine = Depends(get_engine),
     settings: Settings = Depends(get_settings_from_app),
 ) -> DiagnosisResponse:
-    if not settings.dashscope_configured():
-        raise HTTPException(status_code=503, detail="DASHSCOPE_API_KEY is not configured")
+    if not settings.llm_configured():
+        raise HTTPException(status_code=503, detail=settings.llm_missing_configuration_message())
     request = payload.to_diagnosis_create()
     state = await engine.create(
         request,
