@@ -1,4 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.agents import MainAgent
 from app.api import router
@@ -32,6 +36,12 @@ def create_app() -> FastAPI:
     app.state.dedup_service = DeduplicationService(settings.webhook_dedup_cooldown_seconds)
     app.include_router(router)
     app.include_router(webhook_router)
+    app.mount("/ui", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="ui")
+
+    @app.get("/")
+    async def index() -> RedirectResponse:
+        return RedirectResponse(url="/ui/")
+
     return app
 
 

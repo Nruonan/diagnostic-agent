@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Diagnostic Agent</title>
+    <link rel="stylesheet" href="/ui/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <h1>AI Diagnostic Agent</h1>
+          <p id="healthText">连接状态检测中</p>
+        </div>
+        <div class="status-strip">
+          <span id="llmStatus">LLM --</span>
+          <span id="sourceStatus">DataSource --</span>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <aside class="panel controls">
+          <form id="diagnosisForm" class="stack">
+            <div class="field">
+              <label for="faultDescription">故障描述</label>
+              <textarea
+                id="faultDescription"
+                name="faultDescription"
+                rows="7"
+                required
+                minlength="3"
+                maxlength="4000"
+              >登录接口响应超时，用户反馈下单前认证失败，怀疑 user-service 数据库查询慢</textarea>
+            </div>
+
+            <div class="field">
+              <label for="serviceHint">服务线索</label>
+              <input id="serviceHint" name="serviceHint" maxlength="200" value="user-service" />
+            </div>
+
+            <button class="primary" type="submit">新建诊断</button>
+          </form>
+
+          <div class="divider"></div>
+
+          <form id="lookupForm" class="stack compact">
+            <div class="field">
+              <label for="diagnosisId">诊断 ID</label>
+              <input id="diagnosisId" name="diagnosisId" />
+            </div>
+            <div class="button-row">
+              <button type="submit">查询</button>
+              <button id="loadMarkdown" type="button">报告</button>
+            </div>
+          </form>
+
+          <div class="divider"></div>
+
+          <form id="humanInputForm" class="stack compact">
+            <div class="field">
+              <label for="humanInput">人工补充</label>
+              <textarea id="humanInput" name="humanInput" rows="5"></textarea>
+            </div>
+            <button type="submit">提交补充</button>
+          </form>
+        </aside>
+
+        <section class="results">
+          <div class="summary-grid">
+            <article class="metric">
+              <span>状态</span>
+              <strong id="statusValue">--</strong>
+            </article>
+            <article class="metric">
+              <span>置信度</span>
+              <strong id="confidenceValue">--</strong>
+            </article>
+            <article class="metric">
+              <span>证据</span>
+              <strong id="evidenceValue">--</strong>
+            </article>
+            <article class="metric">
+              <span>修复项</span>
+              <strong id="fixValue">--</strong>
+            </article>
+          </div>
+
+          <section class="panel output">
+            <div class="section-head">
+              <h2>根因</h2>
+              <span id="activeId">未选择诊断</span>
+            </div>
+            <p id="rootCause" class="empty">暂无结果</p>
+          </section>
+
+          <section class="panel output two-column">
+            <div>
+              <div class="section-head">
+                <h2>缺失信息</h2>
+              </div>
+              <ul id="needInputList" class="data-list"></ul>
+            </div>
+            <div>
+              <div class="section-head">
+                <h2>修复建议</h2>
+              </div>
+              <ol id="fixList" class="data-list ordered"></ol>
+            </div>
+          </section>
+
+          <section class="panel output two-column">
+            <div>
+              <div class="section-head">
+                <h2>证据</h2>
+              </div>
+              <ul id="evidenceList" class="data-list"></ul>
+            </div>
+            <div>
+              <div class="section-head">
+                <h2>数据源</h2>
+              </div>
+              <div id="dataSourceCounts" class="source-grid"></div>
+            </div>
+          </section>
+
+          <section class="panel output">
+            <div class="section-head">
+              <h2>报告</h2>
+            </div>
+            <pre id="reportBox">暂无报告</pre>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <script src="/ui/app.js" defer></script>
+  </body>
+</html>
