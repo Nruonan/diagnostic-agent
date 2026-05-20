@@ -33,6 +33,10 @@ services:
       XXL_JOB_MYSQL_DATABASE: xxl_job
       XXL_JOB_MYSQL_USER: xxl_job
       XXL_JOB_MYSQL_PASSWORD: ${XXL_JOB_DB_PASSWORD:-xxl_job}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_REPOSITORIES: ${GITHUB_REPOSITORIES:-}
+      GITHUB_REF: ${GITHUB_REF:-}
+      GITHUB_CODE_MAX_RESULTS: ${GITHUB_CODE_MAX_RESULTS:-5}
     ports:
       - "9000:9000"
     depends_on:

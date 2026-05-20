@@ -1,4 +1,6 @@
 import os
+import re
+from base64 import b64decode
 from datetime import datetime, timezone
 from typing import Any
 
@@ -7,14 +9,29 @@ import pymysql
 from fastapi import FastAPI, Query
 
 
+def _env_int(name: str, default: int, minimum: int = 1) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+    return value if value >= minimum else default
+
+
 app = FastAPI(title="Diagnostic Datasource Bridge", version="0.2.0")
 
 ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://elasticsearch:9200").rstrip("/")
 XXL_JOB_MYSQL_HOST = os.getenv("XXL_JOB_MYSQL_HOST", "xxl-job-mysql")
-XXL_JOB_MYSQL_PORT = int(os.getenv("XXL_JOB_MYSQL_PORT", "3306"))
+XXL_JOB_MYSQL_PORT = _env_int("XXL_JOB_MYSQL_PORT", 3306)
 XXL_JOB_MYSQL_DATABASE = os.getenv("XXL_JOB_MYSQL_DATABASE", "xxl_job")
 XXL_JOB_MYSQL_USER = os.getenv("XXL_JOB_MYSQL_USER", "xxl_job")
 XXL_JOB_MYSQL_PASSWORD = os.getenv("XXL_JOB_MYSQL_PASSWORD", "xxl_job")
+GITHUB_API_URL = os.getenv("GITHUB_API_URL", "https://api.github.com").rstrip("/")
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+GITHUB_REPOSITORIES = os.getenv("GITHUB_REPOSITORIES", "")
+GITHUB_REF = os.getenv("GITHUB_REF", "")
+GITHUB_CODE_MAX_RESULTS = _env_int("GITHUB_CODE_MAX_RESULTS", 5)
+GITHUB_CODE_CONTEXT_LINES = _env_int("GITHUB_CODE_CONTEXT_LINES", 8)
+GITHUB_CODE_MAX_FILE_BYTES = _env_int("GITHUB_CODE_MAX_FILE_BYTES", 200000)
 
 
 @app.get("/health")
@@ -24,6 +41,7 @@ async def health() -> dict[str, Any]:
         "mode": "live-bridge",
         "elasticsearch_url": ELASTICSEARCH_URL,
         "xxl_job_mysql_host": XXL_JOB_MYSQL_HOST,
+        "github_repositories": _github_repositories(),
     }
 
 
@@ -67,7 +85,7 @@ async def git_code(
     fault_description: str = Query(min_length=1),
     service_hint: str | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
-    return {"items": []}
+    return {"items": await _search_github_code(fault_description, service_hint)}
 
 
 async def _search_elasticsearch(index: str, service_hint: str | None, size: int = 25) -> list[dict[str, Any]]:
@@ -221,6 +239,210 @@ def _xxl_row_to_job(row: dict[str, Any]) -> dict[str, Any]:
         "message": str(row.get("handle_msg") or f"XXL-Job failed with handle_code={row.get('handle_code')}"),
         "trace_id": f"xxl-job-{row.get('job_id')}-{row.get('job_group')}",
     }
+
+
+async def _search_github_code(fault_description: str, service_hint: str | None) -> list[dict[str, Any]]:
+    repositories = _github_repositories()
+    terms = _code_search_terms(fault_description, service_hint)
+    if not repositories or not terms:
+        return []
+
+    headers = _github_headers()
+    snippets: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    async with httpx.AsyncClient(timeout=15.0, headers=headers) as client:
+        for repository in repositories:
+            search_items = await _github_search_repository(client, repository, terms)
+            for item in search_items:
+                path = str(item.get("path") or "")
+                repo_name = _github_item_repository(item) or repository
+                identity = (repo_name, path)
+                if not path or identity in seen:
+                    continue
+                seen.add(identity)
+                content = await _github_file_content(client, repo_name, path)
+                if not content:
+                    continue
+                snippets.append(_code_snippet(repo_name, path, content, terms, service_hint))
+                if len(snippets) >= GITHUB_CODE_MAX_RESULTS:
+                    return snippets
+    return snippets
+
+
+async def _github_search_repository(
+    client: httpx.AsyncClient,
+    repository: str,
+    terms: list[str],
+) -> list[dict[str, Any]]:
+    query = f"{' '.join(terms[:5])} repo:{repository}"
+    try:
+        response = await client.get(
+            f"{GITHUB_API_URL}/search/code",
+            params={"q": query, "per_page": min(max(GITHUB_CODE_MAX_RESULTS * 2, 1), 20)},
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except (httpx.HTTPError, ValueError):
+        return []
+    items = payload.get("items", [])
+    return items if isinstance(items, list) else []
+
+
+async def _github_file_content(client: httpx.AsyncClient, repository: str, path: str) -> str | None:
+    params = {"ref": GITHUB_REF} if GITHUB_REF else None
+    try:
+        response = await client.get(f"{GITHUB_API_URL}/repos/{repository}/contents/{path}", params=params)
+        response.raise_for_status()
+        payload = response.json()
+    except (httpx.HTTPError, ValueError):
+        return None
+
+    if not isinstance(payload, dict) or payload.get("type") != "file":
+        return None
+    file_size = _int_value(payload.get("size"))
+    if file_size and file_size > GITHUB_CODE_MAX_FILE_BYTES:
+        return None
+    if payload.get("encoding") != "base64" or not isinstance(payload.get("content"), str):
+        return None
+    try:
+        return b64decode(payload["content"]).decode("utf-8", errors="replace")
+    except (ValueError, TypeError):
+        return None
+
+
+def _code_snippet(
+    repository: str,
+    path: str,
+    content: str,
+    terms: list[str],
+    service_hint: str | None,
+) -> dict[str, Any]:
+    lines = content.splitlines()
+    match_line = _first_matching_line(lines, terms)
+    start_line = max(match_line - GITHUB_CODE_CONTEXT_LINES, 1)
+    end_line = min(match_line + GITHUB_CODE_CONTEXT_LINES, len(lines))
+    snippet_lines = lines[start_line - 1 : end_line]
+    return {
+        "repository": repository,
+        "file_path": path,
+        "service": service_hint or repository.rsplit("/", 1)[-1],
+        "start_line": start_line,
+        "end_line": end_line,
+        "language": _language_from_path(path),
+        "content": "\n".join(snippet_lines),
+    }
+
+
+def _first_matching_line(lines: list[str], terms: list[str]) -> int:
+    normalized_terms = [term.lower() for term in terms]
+    for index, line in enumerate(lines, start=1):
+        normalized_line = line.lower()
+        if any(term in normalized_line for term in normalized_terms):
+            return index
+    return 1
+
+
+def _code_search_terms(fault_description: str, service_hint: str | None) -> list[str]:
+    raw_text = " ".join(value for value in (service_hint, fault_description) if value)
+    candidates = re.findall(
+        r"[A-Za-z_][A-Za-z0-9_.-]{2,}|[0-9]+[A-Za-z_][A-Za-z0-9_.-]*",
+        raw_text,
+    )
+    terms: list[str] = []
+    for candidate in candidates:
+        normalized = candidate.strip("._-").lower()
+        if normalized and normalized not in terms and normalized not in _CODE_SEARCH_STOPWORDS:
+            terms.append(normalized)
+    for keyword, replacements in _CODE_SEARCH_TRANSLATIONS.items():
+        if keyword in raw_text:
+            for replacement in replacements:
+                if replacement not in terms:
+                    terms.append(replacement)
+    return terms[:8]
+
+
+def _github_repositories() -> list[str]:
+    repositories: list[str] = []
+    for value in GITHUB_REPOSITORIES.split(","):
+        normalized = _normalize_github_repository(value)
+        if normalized and normalized not in repositories:
+            repositories.append(normalized)
+    return repositories
+
+
+def _normalize_github_repository(value: str) -> str | None:
+    normalized = value.strip().removesuffix(".git").strip("/")
+    normalized = normalized.removeprefix("https://github.com/").removeprefix("http://github.com/")
+    if re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", normalized):
+        return normalized
+    return None
+
+
+def _github_item_repository(item: dict[str, Any]) -> str | None:
+    repository = item.get("repository")
+    if isinstance(repository, dict) and isinstance(repository.get("full_name"), str):
+        return repository["full_name"]
+    return None
+
+
+def _github_headers() -> dict[str, str]:
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "ai-diagnostic-agent-datasource",
+    }
+    if GITHUB_TOKEN:
+        headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+    return headers
+
+
+def _language_from_path(path: str) -> str:
+    extension = path.rsplit(".", 1)[-1].lower() if "." in path else ""
+    return {
+        "go": "go",
+        "java": "java",
+        "js": "javascript",
+        "jsx": "javascript",
+        "kt": "kotlin",
+        "md": "markdown",
+        "php": "php",
+        "py": "python",
+        "rb": "ruby",
+        "rs": "rust",
+        "sql": "sql",
+        "ts": "typescript",
+        "tsx": "typescript",
+        "yaml": "yaml",
+        "yml": "yaml",
+    }.get(extension, extension or "text")
+
+
+_CODE_SEARCH_STOPWORDS = {
+    "and",
+    "api",
+    "are",
+    "for",
+    "http",
+    "https",
+    "service",
+    "the",
+    "with",
+}
+
+_CODE_SEARCH_TRANSLATIONS = {
+    "登录": ["login", "auth"],
+    "认证": ["auth", "authentication"],
+    "鉴权": ["auth", "authorization"],
+    "下单": ["order", "checkout"],
+    "支付": ["payment", "pay"],
+    "超时": ["timeout"],
+    "错误": ["error"],
+    "异常": ["exception"],
+    "数据库": ["database", "db"],
+    "慢查询": ["slow", "query"],
+    "查询": ["query"],
+    "缓存": ["cache"],
+}
 
 
 def _int_value(value: Any) -> int | None:
