@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
 from fastapi.responses import PlainTextResponse, StreamingResponse
 
-from app.api.deps import get_engine, get_event_bus, get_report_generator, get_settings_from_app
+from app.api.deps import get_engine, get_event_bus, get_report_generator, get_settings_from_app, get_store
 from app.config import Settings
 from app.events import WorkflowEventBus
 from app.llm import llm_metrics_registry
@@ -11,6 +11,8 @@ from app.reports import ReportGenerator
 from app.schemas.alerts import AlertEventCreate
 from app.schemas.diagnosis import DiagnosisCreate, DiagnosisResponse, DiagnosisStatus, HumanInputCreate
 from app.schemas.reports import ReportResponse
+from app.schemas.sessions import DiagnosisSessionListResponse, DiagnosisSessionResponse
+from app.storage import DiagnosisStore
 from app.workflow import WorkflowEngine
 
 router = APIRouter()
@@ -76,6 +78,23 @@ async def ingest_alert(
 @router.get("/api/v1/diagnoses/{diagnosis_id}", response_model=DiagnosisResponse)
 async def get_diagnosis(diagnosis_id: str, engine: WorkflowEngine = Depends(get_engine)) -> DiagnosisResponse:
     return DiagnosisResponse(diagnosis=await engine.get(diagnosis_id))
+
+
+@router.get("/api/v1/sessions", response_model=DiagnosisSessionListResponse)
+async def list_sessions(
+    user_id: str | None = None,
+    limit: int = 50,
+    store: DiagnosisStore = Depends(get_store),
+) -> DiagnosisSessionListResponse:
+    return DiagnosisSessionListResponse(sessions=await store.list_sessions(user_id=user_id, limit=limit))
+
+
+@router.get("/api/v1/sessions/{session_id}", response_model=DiagnosisSessionResponse)
+async def get_session(
+    session_id: str,
+    store: DiagnosisStore = Depends(get_store),
+) -> DiagnosisSessionResponse:
+    return DiagnosisSessionResponse(session=await store.get_session(session_id))
 
 
 @router.get("/api/v1/diagnoses/{diagnosis_id}/events")

@@ -23,7 +23,7 @@ def create_app() -> FastAPI:
     agents = MainAgent(settings, llm_client)
     data_source = build_data_source(settings)
     store = build_diagnosis_store(settings)
-    event_bus = WorkflowEventBus()
+    event_bus = WorkflowEventBus(store=store)
     workflow_engine = WorkflowEngine(
         agents=agents,
         data_source=data_source,
@@ -34,6 +34,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title="AI Diagnostic Agent", version="0.1.0")
     app.state.settings = settings
+    app.state.store = store
     app.state.workflow_engine = workflow_engine
     app.state.report_generator = ReportGenerator()
     app.state.dedup_service = DeduplicationService(settings.webhook_dedup_cooldown_seconds)

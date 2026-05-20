@@ -3,6 +3,7 @@ from fastapi import Request
 from app.config import Settings
 from app.events import WorkflowEventBus
 from app.reports import ReportGenerator
+from app.storage import DiagnosisStore
 from app.workflow import WorkflowEngine
 
 
@@ -20,3 +21,7 @@ def get_report_generator(request: Request) -> ReportGenerator:
 
 def get_event_bus(request: Request) -> WorkflowEventBus:
     return request.app.state.event_bus
+
+
+def get_store(request: Request) -> DiagnosisStore:
+    return request.app.state.store

@@ -49,6 +49,16 @@ class WorkflowEngine:
             trigger_context=trigger_context,
         )
         await self.store.save(state)
+        await self.store.create_session(
+            session_id=state.diagnosis_id,
+            diagnosis_id=state.diagnosis_id,
+            title=_session_title(request.fault_description, state.diagnosis_id),
+            metadata={
+                "service_hint": request.service_hint,
+                "trigger_source": trigger_source,
+                "trigger_context": trigger_context,
+            },
+        )
         await self.event_bus.publish(
             diagnosis_id=state.diagnosis_id,
             event="diagnosis_created",
@@ -112,3 +122,10 @@ class WorkflowEngine:
             payload={"errors": [error.model_dump(mode="json") for error in state.errors]},
         )
         return state
+
+
+def _session_title(fault_description: str, fallback: str) -> str:
+    title = " ".join(fault_description.split())
+    if not title:
+        return fallback
+    return title[:120]
